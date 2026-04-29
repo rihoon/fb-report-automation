@@ -76,7 +76,7 @@ if not check_password():
 
 # ────────────────────── 사이드바 ──────────────────────
 
-st.sidebar.markdown("### ⚙️ 보고서 설정")
+st.sidebar.markdown("### 📅 날짜 설정")
 
 today = date.today()
 report_date = st.sidebar.date_input("보고일", value=today, format="YYYY-MM-DD")
@@ -115,17 +115,11 @@ st.sidebar.divider()
 compare_last_week = False
 compare_last_year = False
 
-st.sidebar.markdown("**👤 담당자 필터**")
-all_owners = ["김다빈", "김민지", "고은지", "전수진", "미지정"]
-selected_owners = []
-for owner in all_owners:
-    if st.sidebar.checkbox(owner, value=True, key=f"owner_{owner}"):
-        selected_owners.append(owner)
+# 담당자 필터 제거 — 광고별 상세 표에 담당자 탭이 있어 충분
+selected_owners: list[str] = []  # 빈 리스트 = 전체 표시
 
-st.sidebar.divider()
-
-st.sidebar.markdown("**📂 네이버 마케팅분석 엑셀**")
-st.sidebar.caption("스마트스토어센터 → 데이터분석 → 마케팅분석 → 사용자정의채널 → 다운로드")
+st.sidebar.markdown("### 📂 파일 업로드")
+st.sidebar.caption("스스 관리자센터 → 데이터분석 → 마케팅분석 → 사용자정의채널 → 상세보기 → 엑셀다운로드")
 
 uploaded_current = st.sidebar.file_uploader(
     "집계 기간 엑셀", type=["xlsx"], key="upload_current",
