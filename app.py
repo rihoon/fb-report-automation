@@ -332,7 +332,8 @@ if generate_btn or st.session_state.get("report_loaded", False):
 
     # 유효 판정 — 구글 시트 누적 데이터(7일) + 페북 API created_time
     history = fetch_validity_history(report_dt, lookback_days=7) if not use_mock else {}
-    created_time_lookup = {r.ad.ad_name: r.ad.created_time for r in rows_for_stats}
+    # 옛 캐시(created_time 필드 없음) 호환 — getattr로 안전 fallback
+    created_time_lookup = {r.ad.ad_name: getattr(r.ad, "created_time", None) for r in rows_for_stats}
     merged_df = annotate_validity(
         merged_df,
         history_lookup=history if history else None,
