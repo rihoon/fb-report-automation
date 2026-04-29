@@ -75,6 +75,12 @@ st.markdown(
         padding-top: 0 !important;
         line-height: 1.2;
     }
+    /* 사이드바 입력창 테두리 — 보고일(date_input) / 집계 일수(number_input) */
+    section[data-testid="stSidebar"] [data-testid="stDateInput"] [data-baseweb="input"],
+    section[data-testid="stSidebar"] [data-testid="stNumberInput"] [data-baseweb="input"] {
+        border: 1px solid #D1D5DB !important;
+        border-radius: 8px !important;
+    }
     .stMetric { background: #F9FAFB; border-radius: 12px; padding: 16px; }
     .stMetric label { color: #6B7280 !important; font-size: 13px !important; }
     .stMetric [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 700 !important; }
