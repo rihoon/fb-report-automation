@@ -352,6 +352,19 @@ if generate_btn or st.session_state.get("report_loaded", False):
     ghost_count = sum(item["conversion_count"] for item in unmatched_naver)
 
     st.markdown("### 결과 요약")
+    # ROAS 기준 카드 배경: ≥100% 옅은 핑크 / <100% 옅은 파랑
+    _roas = float(kpi.get("roas", 0) or 0)
+    _metric_bg = "#FCE7F3" if _roas >= 100 else "#DBEAFE"
+    st.markdown(
+        f"""
+        <style>
+        [data-testid="stMetric"], .stMetric {{
+            background: {_metric_bg} !important;
+        }}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     with st.container(border=True):
         c1, c2, c3, c4, c5 = st.columns(5)
         c1.metric(
