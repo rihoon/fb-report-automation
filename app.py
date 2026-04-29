@@ -58,6 +58,23 @@ st.markdown(
     html, body, [class*="css"] {
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif !important;
     }
+    /* 사이드바와 메인 영역 상단 정렬 (날짜 설정 ↔ 페북성과보고서 자동화 같은 높이) */
+    .main .block-container {
+        padding-top: 2.5rem !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
+        padding-top: 2.5rem !important;
+    }
+    .main .block-container h1:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        line-height: 1.2;
+    }
+    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] h3:first-child {
+        margin-top: 0 !important;
+        padding-top: 0 !important;
+        line-height: 1.2;
+    }
     .stMetric { background: #F9FAFB; border-radius: 12px; padding: 16px; }
     .stMetric label { color: #6B7280 !important; font-size: 13px !important; }
     .stMetric [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 700 !important; }
