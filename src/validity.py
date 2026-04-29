@@ -1,11 +1,16 @@
-"""유효 O/X 자동 판정 + 사유 표기.
+"""유효 O/X/— 자동 판정 + 사유 표기.
 
-판정 룰:
-- 7일간 ROAS < 80% → X ("7일간 전환율80%미만")
-- 7일치 데이터 부족 → "러닝중" (판정 보류, 머신러닝 단계)
-- 그 외 → O
+판정 룰 (우선순위 순):
+1. 광고 등록 < 7일       → "—" / "데이터 부족"
+2. 7일 매출 = 0          → "X" / "7일 매출 0"
+3. 7일 ROAS<80% & 최근 ROAS≥100% → "O" / "최근 성과 좋음"
+4. 7일 ROAS<80% & 최근 ROAS<100% → "X" / "7일 전환 80%미만"
+5. 7일 ROAS ≥ 80%        → "O" / ""
 
-판정 데이터: 구글 시트 누적_보고서에서 최근 7일치 합산
+데이터 소스:
+- 광고 등록일: 페북 API created_time
+- 7일 매출/ROAS: 구글 시트 누적 보고서에서 합산
+- 최근 보고기간 ROAS: 현재 보고서의 ROAS 컬럼
 """
 
 from __future__ import annotations
@@ -14,63 +19,89 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 
-from src.matching import MatchedRow
-
 
 def evaluate_validity(
-    ad_name: str,
+    history_7d_revenue: float,
     history_7d_roas: float,
-    has_enough_history: bool,
-    history_7d_spend: float = 0.0,
+    current_roas: float,
+    created_time: datetime | None,
+    report_date: datetime,
 ) -> tuple[str, str]:
     """광고 1건의 유효성 판정.
 
     Args:
-        history_7d_roas: 최근 7일 ROAS (%).
-        has_enough_history: 7일치 데이터가 충분히 누적됐는지.
-        history_7d_spend: 최근 7일 광고비 (데이터 부족 판정용).
+        history_7d_revenue: 최근 7일 누적 매출 (원).
+        history_7d_roas: 최근 7일 누적 ROAS (%).
+        current_roas: 현재 보고서 기간 ROAS (%).
+        created_time: 광고 등록일 (없으면 None).
+        report_date: 보고일.
 
     Returns:
-        (status, reason) — status ∈ {"O", "X", "러닝중"}
+        (status, reason) — status ∈ {"O", "X", "—"}
     """
-    if not has_enough_history:
-        # 7일 누적 광고비도 0이면 "데이터 부족" (시트에 이력 자체가 없음)
-        if history_7d_spend <= 0:
-            return "러닝중", "데이터 부족"
-        return "러닝중", "머신러닝 단계"
-    if history_7d_roas < 80:
-        return "X", "7일간 전환율80%미만"
+    # 1. 광고 등록 < 7일 → "-" / 데이터 부족
+    if created_time is not None:
+        days_since_created = (report_date - created_time).days
+        if days_since_created < 7:
+            return "—", "데이터 부족"
+
+    # created_time을 못 받았으면 (None) → 이력 자체로 판정 (보수적으로 7일 매출 0이면 X 등)
+    # 단, 시트에도 이력이 없으면 "-" / "데이터 부족"으로 보호
+    if created_time is None and history_7d_revenue == 0 and history_7d_roas == 0:
+        return "—", "데이터 부족"
+
+    # 2. 7일 매출 0 → 무조건 X
+    if history_7d_revenue <= 0:
+        return "X", "7일 매출 0"
+
+    # 3. 7일 ROAS<80% & 최근 ROAS≥100% → O
+    if history_7d_roas < 80 and current_roas >= 100:
+        return "O", "최근 성과 좋음"
+
+    # 4. 7일 ROAS<80% & 최근 ROAS<100% → X
+    if history_7d_roas < 80 and current_roas < 100:
+        return "X", "7일 전환 80%미만"
+
+    # 5. Default — 7일 ROAS≥80% → O
     return "O", ""
 
 
 def annotate_validity(
     df: pd.DataFrame,
     history_lookup: dict[str, dict] | None = None,
+    created_time_lookup: dict[str, datetime | None] | None = None,
+    report_date: datetime | None = None,
 ) -> pd.DataFrame:
     """DataFrame에 유효 / 사유 컬럼 추가.
 
     Args:
-        df: aggregation의 결과 DataFrame.
-        history_lookup: {광고이름: {"7d_revenue": ..., "7d_spend": ..., "7d_roas": ..., "has_enough_history": ...}}
-                        없으면 모든 행을 "데이터 부족"으로 처리.
+        df: aggregation 결과 DataFrame ("광고이름", "ROAS" 컬럼 필수).
+        history_lookup: {광고이름: {"7d_revenue", "7d_spend", "7d_roas", "has_enough_history"}}.
+        created_time_lookup: {광고이름: datetime | None}.
+        report_date: 보고일 (기본값: 오늘).
     """
     df = df.copy()
+    if report_date is None:
+        report_date = datetime.now()
+
     statuses: list[str] = []
     reasons: list[str] = []
 
     for _, row in df.iterrows():
         ad_name = row["광고이름"]
-        if history_lookup and ad_name in history_lookup:
-            h = history_lookup[ad_name]
-            status, reason = evaluate_validity(
-                ad_name,
-                h.get("7d_roas", 0),
-                h.get("has_enough_history", False),
-                h.get("7d_spend", 0),
-            )
-        else:
-            # 누적 시트에 이력 자체가 없음 → 데이터 부족
-            status, reason = "러닝중", "데이터 부족"
+        h = (history_lookup or {}).get(ad_name, {})
+        history_7d_revenue = float(h.get("7d_revenue", 0) or 0)
+        history_7d_roas = float(h.get("7d_roas", 0) or 0)
+        current_roas = float(row.get("ROAS") or 0)
+        created_time = (created_time_lookup or {}).get(ad_name)
+
+        status, reason = evaluate_validity(
+            history_7d_revenue=history_7d_revenue,
+            history_7d_roas=history_7d_roas,
+            current_roas=current_roas,
+            created_time=created_time,
+            report_date=report_date,
+        )
         statuses.append(status)
         reasons.append(reason)
 

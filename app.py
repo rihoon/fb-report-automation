@@ -330,9 +330,15 @@ if generate_btn or st.session_state.get("report_loaded", False):
     # 비교 컬럼 추가
     merged_df = merge_comparison(current_df, last_year_df, last_week_df)
 
-    # 유효 판정 — 구글 시트 누적 데이터에서 7일치 history 읽어와 활용
+    # 유효 판정 — 구글 시트 누적 데이터(7일) + 페북 API created_time
     history = fetch_validity_history(report_dt, lookback_days=7) if not use_mock else {}
-    merged_df = annotate_validity(merged_df, history_lookup=history if history else None)
+    created_time_lookup = {r.ad.ad_name: r.ad.created_time for r in rows_for_stats}
+    merged_df = annotate_validity(
+        merged_df,
+        history_lookup=history if history else None,
+        created_time_lookup=created_time_lookup,
+        report_date=report_dt,
+    )
 
     # 7일 누적 컬럼 (7일지출/7일매출/7일ROAS) 추가 — 같은 history_lookup 사용
     merged_df = merge_seven_day(merged_df, history)

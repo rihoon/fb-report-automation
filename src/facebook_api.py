@@ -110,10 +110,10 @@ def _fetch_real(
 
     insights = list(account.get_insights(fields=fields, params=params))
 
-    # ad_id별 link_url + effective_status 조회
+    # ad_id별 link_url + 메타데이터(effective_status + created_time) 조회
     ad_ids = list({row.get("ad_id") for row in insights if row.get("ad_id")})
     link_url_by_ad_id = _fetch_ad_link_urls(ad_ids)
-    status_by_ad_id = _fetch_ad_statuses(ad_ids)
+    metadata_by_ad_id = _fetch_ad_metadata(ad_ids)
 
     results = []
     for row in insights:
@@ -125,8 +125,9 @@ def _fetch_real(
             campaign_name=row.get("campaign_name", ""),
         )
 
+        meta = metadata_by_ad_id.get(ad_id, {"status": "ACTIVE", "created_time": None})
         # effective_status: ACTIVE만 active, 나머지(PAUSED/DELETED/ARCHIVED 등) inactive
-        raw_status = status_by_ad_id.get(ad_id, "ACTIVE")
+        raw_status = meta.get("status", "ACTIVE")
         delivery_status = "active" if str(raw_status).upper() == "ACTIVE" else "inactive"
 
         results.append(
@@ -147,6 +148,7 @@ def _fetch_real(
                 nt_medium=nt_params.get("nt_medium", ""),
                 nt_detail=nt_params.get("nt_detail", ""),
                 nt_keyword=nt_params.get("nt_keyword", ""),
+                created_time=meta.get("created_time"),
             )
         )
     return results
@@ -159,24 +161,41 @@ def get_link_url_debug() -> dict:
     return _link_url_debug
 
 
-def _fetch_ad_statuses(ad_ids: list[str]) -> dict[str, str]:
-    """ad_id별 effective_status 조회.
+def _fetch_ad_metadata(ad_ids: list[str]) -> dict[str, dict]:
+    """ad_id별 effective_status + created_time 조회.
 
     ACTIVE → 켜진 광고
     PAUSED / DELETED / ARCHIVED / DISAPPROVED 등 → 꺼진 광고
+    created_time → 광고 등록일 (ISO 8601 → datetime)
 
-    실패하면 ACTIVE로 fallback (보고서에서 빠지지 않도록).
+    실패하면 ACTIVE / None으로 fallback.
     """
     from facebook_business.adobjects.ad import Ad
-    result: dict[str, str] = {}
+    result: dict[str, dict] = {}
     for ad_id in ad_ids:
         try:
-            ad = Ad(ad_id).api_get(fields=[Ad.Field.effective_status])
-            status = ad.get("effective_status") or "ACTIVE"
-            result[ad_id] = str(status)
+            ad = Ad(ad_id).api_get(fields=[Ad.Field.effective_status, Ad.Field.created_time])
+            ct_str = ad.get("created_time")
+            ct: datetime | None = None
+            if ct_str:
+                # 페북 포맷: "2024-10-15T05:23:01+0900" — 앞 19자만 파싱
+                try:
+                    ct = datetime.strptime(str(ct_str)[:19], "%Y-%m-%dT%H:%M:%S")
+                except ValueError:
+                    ct = None
+            result[ad_id] = {
+                "status": str(ad.get("effective_status") or "ACTIVE"),
+                "created_time": ct,
+            }
         except Exception:
-            result[ad_id] = "ACTIVE"
+            result[ad_id] = {"status": "ACTIVE", "created_time": None}
     return result
+
+
+def _fetch_ad_statuses(ad_ids: list[str]) -> dict[str, str]:
+    """호환용 — 메타데이터에서 status만 추출."""
+    metadata = _fetch_ad_metadata(ad_ids)
+    return {k: v["status"] for k, v in metadata.items()}
 
 
 def _fetch_ad_link_urls(ad_ids: list[str]) -> dict[str, str]:

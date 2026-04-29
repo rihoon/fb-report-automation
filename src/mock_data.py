@@ -54,6 +54,7 @@ class FacebookAd:
     nt_medium: str = ""
     nt_detail: str = ""
     nt_keyword: str = ""
+    created_time: datetime | None = None  # 광고 등록일 (페북 API created_time)
 
     @property
     def nt_key(self) -> tuple:
