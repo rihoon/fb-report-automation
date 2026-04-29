@@ -163,6 +163,22 @@ st.markdown(
     section[data-testid="stSidebar"] [data-testid="stFileUploader"] button {
         width: 100% !important;
     }
+    /* 알림(st.info / st.warning) 박스 — 파란/노란 톤 → 중립 회색 */
+    [data-testid="stAlert"],
+    [data-testid="stAlertContentInfo"],
+    [data-testid="stAlertContentWarning"],
+    [data-testid="stNotification"],
+    [role="alert"] {
+        background-color: #FAFAFA !important;
+        border: 1px solid #E5E7EB !important;
+        border-radius: 8px !important;
+        color: #111111 !important;
+    }
+    [data-testid="stAlert"] *,
+    [data-testid="stNotification"] *,
+    [role="alert"] * {
+        color: #111111 !important;
+    }
     .stMetric { background: #FAFAFA; border-radius: 12px; padding: 16px; }
     .stMetric label { color: #666666 !important; font-size: 13px !important; }
     .stMetric [data-testid="stMetricValue"] { color: #111111 !important; font-weight: 700 !important; }
