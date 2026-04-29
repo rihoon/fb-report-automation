@@ -335,46 +335,46 @@ if generate_btn or st.session_state.get("report_loaded", False):
     ghost_count = sum(item["conversion_count"] for item in unmatched_naver)
 
     st.markdown("### 결과 요약")
-    c1, c2, c3, c4, c5 = st.columns(5)
-    c1.metric(
-        "총 광고비",
-        f"₩{kpi['total_spend']:,.0f}",
-        delta=f"{deltas['spend']:+.1f}% (작년)" if deltas["spend"] is not None else None,
-        delta_color="inverse",
-    )
-    c2.metric(
-        "총 매출",
-        f"₩{kpi['total_revenue']:,.0f}",
-        delta=f"{deltas['revenue']:+.1f}% (작년)" if deltas["revenue"] is not None else None,
-    )
-    c3.metric(
-        "ROAS",
-        f"{kpi['roas']:.0f}%",
-        delta=f"{deltas['roas']:+.1f}% (작년)" if deltas["roas"] is not None else None,
-    )
-    c4.metric(
-        "전환수",
-        f"{kpi['conversion_count']:,}",
-        delta=f"{deltas['conversion']:+.1f}% (작년)" if deltas["conversion"] is not None else None,
-    )
-    c5.metric(
-        "꺼진 광고 매출",
-        f"₩{ghost_revenue:,.0f}",
-        delta=f"{ghost_count}건" if ghost_count else None,
-        delta_color="off",
-        help="현재 활성 페북 광고에 매칭 안 됐지만 페북 출처(facebook)인 매출. 보통 꺼진 광고의 지연 전환.",
-    )
+    with st.container(border=True):
+        c1, c2, c3, c4, c5 = st.columns(5)
+        c1.metric(
+            "총 광고비",
+            f"₩{kpi['total_spend']:,.0f}",
+            delta=f"{deltas['spend']:+.1f}% (작년)" if deltas["spend"] is not None else None,
+            delta_color="inverse",
+        )
+        c2.metric(
+            "총 매출",
+            f"₩{kpi['total_revenue']:,.0f}",
+            delta=f"{deltas['revenue']:+.1f}% (작년)" if deltas["revenue"] is not None else None,
+        )
+        c3.metric(
+            "ROAS",
+            f"{kpi['roas']:.0f}%",
+            delta=f"{deltas['roas']:+.1f}% (작년)" if deltas["roas"] is not None else None,
+        )
+        c4.metric(
+            "전환수",
+            f"{kpi['conversion_count']:,}",
+            delta=f"{deltas['conversion']:+.1f}% (작년)" if deltas["conversion"] is not None else None,
+        )
+        c5.metric(
+            "꺼진 광고 매출",
+            f"₩{ghost_revenue:,.0f}",
+            delta=f"{ghost_count}건" if ghost_count else None,
+            delta_color="off",
+            help="현재 활성 페북 광고에 매칭 안 됐지만 페북 출처(facebook)인 매출. 보통 꺼진 광고의 지연 전환.",
+        )
 
-    st.divider()
+        st.divider()
 
-    # ────────────────────── 매칭 통계 ──────────────────────
-
-    stats = matching_stats(rows_for_stats, unmatched_naver)
-    info_cols = st.columns(2)
-    info_cols[0].info(
-        f"매칭률: **{stats['match_rate']:.1f}%** ({stats['matched_ads']:,}/{stats['total_ads']:,} 광고)"
-    )
-    info_cols[1].info(f"매칭 매출: **₩{stats['matched_revenue']:,.0f}**")
+        # ────────────────────── 매칭 통계 ──────────────────────
+        stats = matching_stats(rows_for_stats, unmatched_naver)
+        info_cols = st.columns(2)
+        info_cols[0].info(
+            f"매칭률: **{stats['match_rate']:.1f}%** ({stats['matched_ads']:,}/{stats['total_ads']:,} 광고)"
+        )
+        info_cols[1].info(f"매칭 매출: **₩{stats['matched_revenue']:,.0f}**")
 
     # 담당자별 요약
     st.markdown("### 담당자별 요약")
