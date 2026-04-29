@@ -84,6 +84,12 @@ st.markdown(
         padding-top: 0 !important;
         line-height: 1.2 !important;
     }
+    /* 메인 영역 섹션 헤더(담당자별 요약, 광고별 상세 등) — 1.5rem 통일 */
+    .main .block-container h3 {
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        color: #111111 !important;
+    }
     /* 사이드바 입력창 테두리 — 보고일(date_input) */
     section[data-testid="stSidebar"] [data-testid="stDateInput"] [data-baseweb="input"] {
         border: 1px solid #E5E7EB !important;
