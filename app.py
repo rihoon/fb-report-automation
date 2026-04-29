@@ -169,7 +169,7 @@ st.markdown(
     [data-testid="stAlertContentWarning"],
     [data-testid="stNotification"],
     [role="alert"] {
-        background-color: #FAFAFA !important;
+        background-color: #F0F0F0 !important;
         border: none !important;
         box-shadow: none !important;
         border-radius: 8px !important;
