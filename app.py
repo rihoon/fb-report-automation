@@ -96,7 +96,7 @@ if not check_password():
 st.sidebar.markdown("### 📅 날짜 설정")
 
 today = date.today()
-report_date = st.sidebar.date_input("보고일", value=today, format="YYYY-MM-DD")
+report_date = st.sidebar.date_input("**보고일**", value=today, format="YYYY-MM-DD")
 report_dt = datetime.combine(report_date, datetime.min.time())
 
 # 요일별 자동 집계 일수 (월=3, 수=2, 금=2, 그 외=1)
@@ -105,7 +105,7 @@ weekday_label = ["월", "화", "수", "목", "금", "토", "일"][report_dt.week
 
 # 집계 일수 직접 변경 가능 (연휴 등)
 days = st.sidebar.number_input(
-    f"집계 일수 (자동: {auto_days}일)",
+    f"**집계 일수** (자동: {auto_days}일)",
     min_value=1,
     max_value=14,
     value=int(auto_days),
@@ -139,7 +139,7 @@ st.sidebar.markdown("### 📂 파일 업로드")
 st.sidebar.caption("스스 관리자센터 → 데이터분석 → 마케팅분석 → 사용자정의채널 → 상세보기 → 엑셀다운로드")
 
 uploaded_current = st.sidebar.file_uploader(
-    "집계 기간 엑셀", type=["xlsx"], key="upload_current",
+    "**집계 기간 엑셀**", type=["xlsx"], key="upload_current",
 )
 st.sidebar.caption("ℹ️ 지난주·작년 데이터는 구글 시트 누적 탭에서 자동 조회됩니다.")
 
