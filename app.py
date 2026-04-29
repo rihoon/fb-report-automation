@@ -75,10 +75,10 @@ st.markdown(
         padding-top: 0 !important;
         line-height: 1.2;
     }
-    /* 사이드바 헤더(날짜 설정 / 파일 업로드) — 작고 단정한 섹션 헤더 */
+    /* 사이드바 헤더(날짜 설정 / 파일 업로드) — 20px 섹션 헤더 */
     section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] h3 {
-        font-size: 1rem !important;
-        font-weight: 600 !important;
+        font-size: 20px !important;
+        font-weight: 700 !important;
         color: #111111 !important;
         line-height: 1.3 !important;
     }
@@ -87,9 +87,9 @@ st.markdown(
         margin-top: 0 !important;
         padding-top: 0 !important;
     }
-    /* 메인 영역 섹션 헤더(담당자별 요약, 광고별 상세 등) — 1.5rem 통일 */
+    /* 메인 영역 섹션 헤더(결과 요약, 담당자별 요약, 광고별 상세) — 20px */
     .main .block-container h3 {
-        font-size: 1.5rem !important;
+        font-size: 20px !important;
         font-weight: 700 !important;
         color: #111111 !important;
     }
@@ -316,6 +316,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
     ghost_revenue = sum(item["revenue"] for item in unmatched_naver)
     ghost_count = sum(item["conversion_count"] for item in unmatched_naver)
 
+    st.markdown("### 결과 요약")
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric(
         "총 광고비",
