@@ -366,8 +366,6 @@ if generate_btn or st.session_state.get("report_loaded", False):
             help="현재 활성 페북 광고에 매칭 안 됐지만 페북 출처(facebook)인 매출. 보통 꺼진 광고의 지연 전환.",
         )
 
-        st.divider()
-
         # ────────────────────── 매칭 통계 ──────────────────────
         stats = matching_stats(rows_for_stats, unmatched_naver)
         info_cols = st.columns(2)
