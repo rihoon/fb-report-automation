@@ -45,7 +45,7 @@ from src.validity import annotate_validity
 
 st.set_page_config(
     page_title="페북성과보고서 자동화",
-    page_icon="📊",
+    page_icon="assets/icon.png",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -142,7 +142,7 @@ generate_btn = st.sidebar.button("🚀 보고서 생성", use_container_width=Tr
 
 # ────────────────────── 메인 영역 ──────────────────────
 
-st.markdown("# 📊 페북성과보고서 자동화")
+st.markdown("# ⚡ 페북성과보고서 자동화")
 st.caption(f"보고일: **{report_date.strftime('%Y년 %m월 %d일')} ({weekday_label})** | 집계 {days}일치")
 
 
