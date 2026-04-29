@@ -268,7 +268,7 @@ generate_btn = st.sidebar.button("보고서 생성", use_container_width=True, t
 # ────────────────────── 메인 영역 ──────────────────────
 
 st.markdown(
-    '<h1 style="font-size: 1.5rem; font-weight: 700; margin: 0; color: #111111;">페북 성과보고서 오토파일럿</h1>',
+    '<h1 style="font-size: 1.75rem; font-weight: 700; margin: 0; color: #111111;">페북 성과보고서 오토파일럿</h1>',
     unsafe_allow_html=True,
 )
 st.caption(f"보고일: **{report_date.strftime('%Y년 %m월 %d일')} ({weekday_label})** | 집계 {days}일치")
