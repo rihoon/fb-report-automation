@@ -90,6 +90,13 @@ st.markdown(
         border-radius: 8px !important;
         overflow: hidden;
     }
+    /* 사이드바 집계 기간 엑셀(file_uploader) — 흰 배경 제거 + 보고일과 동일한 테두리 */
+    section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
+    section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] {
+        background: transparent !important;
+        border: 1px solid #D1D5DB !important;
+        border-radius: 8px !important;
+    }
     .stMetric { background: #F9FAFB; border-radius: 12px; padding: 16px; }
     .stMetric label { color: #6B7280 !important; font-size: 13px !important; }
     .stMetric [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 700 !important; }
