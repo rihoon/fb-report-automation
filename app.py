@@ -77,7 +77,7 @@ st.markdown(
     }
     /* 사이드바 입력창 테두리 — 보고일(date_input) */
     section[data-testid="stSidebar"] [data-testid="stDateInput"] [data-baseweb="input"] {
-        border: 1px solid #D1D5DB !important;
+        border: 1px solid #E5E7EB !important;
         border-radius: 8px !important;
     }
     /* 사이드바 집계 일수(number_input) — 입력+버튼 통합 테두리 */
@@ -86,7 +86,7 @@ st.markdown(
         background: transparent !important;
     }
     section[data-testid="stSidebar"] [data-testid="stNumberInput"] > div:not([data-testid="stWidgetLabel"]):not(label) {
-        border: 1px solid #D1D5DB !important;
+        border: 1px solid #E5E7EB !important;
         border-radius: 8px !important;
         overflow: hidden;
     }
@@ -105,9 +105,9 @@ st.markdown(
     section[data-testid="stSidebar"] [data-testid="stFileUploader"] button {
         width: 100% !important;
     }
-    .stMetric { background: #F9FAFB; border-radius: 12px; padding: 16px; }
-    .stMetric label { color: #6B7280 !important; font-size: 13px !important; }
-    .stMetric [data-testid="stMetricValue"] { color: #111827 !important; font-weight: 700 !important; }
+    .stMetric { background: #FAFAFA; border-radius: 12px; padding: 16px; }
+    .stMetric label { color: #666666 !important; font-size: 13px !important; }
+    .stMetric [data-testid="stMetricValue"] { color: #111111 !important; font-weight: 700 !important; }
     div[data-testid="stMetricDelta"] { font-weight: 600; }
     </style>
     """,
@@ -123,7 +123,7 @@ if not check_password():
 
 # ────────────────────── 사이드바 ──────────────────────
 
-st.sidebar.markdown("### 📅 날짜 설정")
+st.sidebar.markdown("### 날짜 설정")
 
 today = date.today()
 report_date = st.sidebar.date_input("**보고일**", value=today, format="YYYY-MM-DD")
@@ -165,7 +165,7 @@ compare_last_year = False
 # 담당자 필터 제거 — 광고별 상세 표에 담당자 탭이 있어 충분
 selected_owners: list[str] = []  # 빈 리스트 = 전체 표시
 
-st.sidebar.markdown("### 📂 파일 업로드")
+st.sidebar.markdown("### 파일 업로드")
 
 uploaded_current = st.sidebar.file_uploader(
     "**집계 기간 엑셀**", type=["xlsx"], key="upload_current",
@@ -181,7 +181,7 @@ st.sidebar.divider()
 # Mock 토글 제거 — 실제 데이터 모드 고정
 use_mock = False
 
-generate_btn = st.sidebar.button("🚀 보고서 생성", use_container_width=True, type="primary")
+generate_btn = st.sidebar.button("보고서 생성", use_container_width=True, type="primary")
 
 
 # ────────────────────── 메인 영역 ──────────────────────
@@ -224,10 +224,10 @@ if generate_btn or st.session_state.get("report_loaded", False):
 
     # 실제 모드인데 엑셀 없음 → 안내
     if not use_mock and uploaded_current is None:
-        st.warning("⚠️ 사이드바에서 **마케팅분석 엑셀**을 업로드해주세요.")
+        st.warning("사이드바에서 **마케팅분석 엑셀**을 업로드해주세요.")
         st.stop()
 
-    with st.spinner("📡 페북 + 네이버 데이터 처리 중..."):
+    with st.spinner("페북 + 네이버 데이터 처리 중..."):
         # 현재 기간
         ads = _load_facebook(start.isoformat(), end.isoformat(), use_mock)
         naver_agg = _load_naver_data(uploaded_current, use_mock, fb_ads_for_mock=ads)
@@ -275,28 +275,28 @@ if generate_btn or st.session_state.get("report_loaded", False):
 
     c1, c2, c3, c4, c5 = st.columns(5)
     c1.metric(
-        "💰 총 광고비",
+        "총 광고비",
         f"₩{kpi['total_spend']:,.0f}",
         delta=f"{deltas['spend']:+.1f}% (작년)" if deltas["spend"] is not None else None,
         delta_color="inverse",
     )
     c2.metric(
-        "💵 총 매출",
+        "총 매출",
         f"₩{kpi['total_revenue']:,.0f}",
         delta=f"{deltas['revenue']:+.1f}% (작년)" if deltas["revenue"] is not None else None,
     )
     c3.metric(
-        "📈 ROAS",
+        "ROAS",
         f"{kpi['roas']:.0f}%",
         delta=f"{deltas['roas']:+.1f}% (작년)" if deltas["roas"] is not None else None,
     )
     c4.metric(
-        "🛒 전환수",
+        "전환수",
         f"{kpi['conversion_count']:,}",
         delta=f"{deltas['conversion']:+.1f}% (작년)" if deltas["conversion"] is not None else None,
     )
     c5.metric(
-        "🪦 꺼진 광고 매출",
+        "꺼진 광고 매출",
         f"₩{ghost_revenue:,.0f}",
         delta=f"{ghost_count}건" if ghost_count else None,
         delta_color="off",
@@ -315,7 +315,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
     info_cols[1].info(f"매칭 매출: **₩{stats['matched_revenue']:,.0f}**")
 
     # 담당자별 요약
-    st.markdown("### 👥 담당자별 요약")
+    st.markdown("### 담당자별 요약")
     owner_summary = aggregate_by_owner(merged_df)
     if not owner_summary.empty:
         owner_display = owner_summary.rename(columns={"지출": "광고비"})
@@ -333,18 +333,18 @@ if generate_btn or st.session_state.get("report_loaded", False):
         st.info("담당자별 집계 데이터가 없습니다.")
 
     if compare_last_year and last_year_df.empty:
-        st.warning("⚠️ 작년 동기 데이터가 없습니다. 사이드바에서 작년 엑셀도 업로드하면 비교가 가능해요.")
+        st.warning("작년 동기 데이터가 없습니다. 사이드바에서 작년 엑셀도 업로드하면 비교가 가능해요.")
     if compare_last_week and last_week_df.empty:
-        st.warning("⚠️ 지난주 데이터가 없습니다. 사이드바에서 지난주 엑셀도 업로드하면 비교가 가능해요.")
+        st.warning("지난주 데이터가 없습니다. 사이드바에서 지난주 엑셀도 업로드하면 비교가 가능해요.")
 
     # 매칭률 0%면 페북 URL 진단 정보 표시
     if not use_mock and stats["match_rate"] == 0 and stats["total_ads"] > 0:
         debug = get_link_url_debug()
-        with st.expander("🔍 페북 광고 URL 진단 (매칭률 0%일 때)", expanded=True):
+        with st.expander("페북 광고 URL 진단 (매칭률 0%일 때)", expanded=True):
             st.caption("페북 광고에서 link_url 가져오기 + nt_detail 추출 결과")
             errors = debug.get("errors", [])
             if errors:
-                st.error(f"❌ URL 조회 에러 {len(errors)}건. 첫 3건:")
+                st.error(f"URL 조회 에러 {len(errors)}건. 첫 3건:")
                 for e in errors[:3]:
                     st.code(e)
             samples = debug.get("samples", [])
@@ -357,7 +357,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
 
     # ────────────────────── 광고별 상세 표 ──────────────────────
 
-    st.markdown("### 📋 광고별 상세")
+    st.markdown("### 광고별 상세")
 
     available_owners = sorted(display_df["담당자"].unique())
     if available_owners:
@@ -377,7 +377,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
     failed_fb_rows = [r for r in rows_for_stats if not r.matched]
     if failed_fb_rows or unmatched_naver:
         with st.expander(
-            f"🔎 매칭 진단 — 파라미터 비교 (페북 매칭 실패 {len(failed_fb_rows)}건 / 매출 있는 미매칭 네이버 {len(unmatched_naver)}건)",
+            f"매칭 진단 — 파라미터 비교 (페북 매칭 실패 {len(failed_fb_rows)}건 / 매출 있는 미매칭 네이버 {len(unmatched_naver)}건)",
             expanded=False,
         ):
             tab_fb, tab_nv = st.tabs(["페북 (매칭 실패)", "네이버 (페북에 없는 매출)"])
@@ -407,7 +407,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
                         },
                     )
                 else:
-                    st.info("✅ 매칭 실패한 페북 광고 없음")
+                    st.info("매칭 실패한 페북 광고 없음")
 
             with tab_nv:
                 if unmatched_naver:
@@ -416,13 +416,13 @@ if generate_btn or st.session_state.get("report_loaded", False):
                     nv_diag.columns = ["nt_source", "nt_medium", "nt_detail", "nt_keyword", "결제금액", "결제수", "유입수"]
                     st.dataframe(nv_diag, use_container_width=True, height=300)
                 else:
-                    st.info("✅ 매칭 안 된 네이버 매출 없음")
+                    st.info("매칭 안 된 네이버 매출 없음")
 
     # ────────────────────── 매칭 안 된 nt_detail (수동 매칭) ──────────────────────
 
     if unmatched_naver:
         with st.expander(
-            f"⚠️ 매칭 안 된 네이버 행 {len(unmatched_naver)}건 — 수동 매칭",
+            f"매칭 안 된 네이버 행 {len(unmatched_naver)}건 — 수동 매칭",
             expanded=False,
         ):
             st.caption(
@@ -431,7 +431,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
             )
 
             # 1. 페북 광고 전체 참고 표 (URL/파라미터 포함)
-            st.markdown("**📌 페북 광고 32개 전체 (참고용 — URL/파라미터 비교)**")
+            st.markdown("**페북 광고 32개 전체 (참고용 — URL/파라미터 비교)**")
             fb_reference_df = pd.DataFrame([
                 {
                     "광고이름": r.ad.ad_name,
@@ -460,7 +460,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
             st.divider()
 
             # 2. 매칭 안 된 네이버 행 + 드롭다운
-            st.markdown("**🔧 매칭 작업**")
+            st.markdown("**매칭 작업**")
             ad_options = ["(매칭 안 함)"] + [
                 f"{r.ad.ad_name}  |  {r.ad.nt_detail}/{r.ad.nt_keyword}"
                 for r in sorted(rows_for_stats, key=lambda x: x.ad.ad_name)
@@ -497,7 +497,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
                     selected_ad_name = selected.split("  |  ")[0].strip()
                     new_overrides[selected_ad_name] = (item["nt_detail"], item["nt_keyword"])
 
-            if st.button("✅ 수동 매칭 적용", key="apply_manual_match"):
+            if st.button("수동 매칭 적용", key="apply_manual_match"):
                 st.session_state["manual_overrides"] = new_overrides
                 for ad_name, key in new_overrides.items():
                     log_manual_match("/".join(key), ad_name, user="user", reason="수동 매칭")
@@ -508,23 +508,23 @@ if generate_btn or st.session_state.get("report_loaded", False):
 
     st.divider()
 
-    if st.button("☁️ 구글 시트 누적 저장", use_container_width=True, type="primary"):
+    if st.button("구글 시트 누적 저장", use_container_width=True, type="primary"):
         with st.spinner("구글 시트에 저장 중..."):
             try:
                 ok, msg = append_report(display_df, report_dt)
             except Exception as e:
                 ok, msg = False, f"예외 발생: {type(e).__name__}: {e}"
         st.session_state["sheet_save_result"] = (ok, msg)
-        st.toast(("✅ " if ok else "❌ ") + msg, icon="☁️")
+        st.toast(msg)
         st.rerun()
 
     # 저장 결과 영구 표시
     if "sheet_save_result" in st.session_state:
         ok, msg = st.session_state["sheet_save_result"]
         if ok:
-            st.success(f"☁️ 구글 시트: {msg}")
+            st.success(f"구글 시트: {msg}")
         else:
-            st.error(f"☁️ 구글 시트 저장 실패: {msg}")
+            st.error(f"구글 시트 저장 실패: {msg}")
 
 else:
-    st.info("👈 사이드바에서 **마케팅분석 엑셀 업로드** + **🚀 보고서 생성** 버튼을 눌러주세요.")
+    st.info("사이드바에서 **마케팅분석 엑셀 업로드** + **보고서 생성** 버튼을 눌러주세요.")
