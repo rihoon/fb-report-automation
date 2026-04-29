@@ -94,16 +94,25 @@ st.markdown(
         border-radius: 8px !important;
         overflow: hidden;
     }
-    /* 사이드바 캡션(설명 텍스트) 폰트 사이즈/행간 축소 */
-    section[data-testid="stSidebar"] [data-testid="stCaption"] {
+    /* 사이드바 캡션(설명 텍스트) 폰트 사이즈/행간 축소 — 여러 셀렉터 fallback */
+    section[data-testid="stSidebar"] [data-testid="stCaption"],
+    section[data-testid="stSidebar"] [data-testid="stCaption"] *,
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"],
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] *,
+    section[data-testid="stSidebar"] small,
+    section[data-testid="stSidebar"] small * {
         font-size: 11px !important;
         line-height: 1.4 !important;
     }
-    section[data-testid="stSidebar"] [data-testid="stCaption"] ul {
+    section[data-testid="stSidebar"] [data-testid="stCaption"] ul,
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] ul,
+    section[data-testid="stSidebar"] small ul {
         margin: 0 !important;
         padding-left: 1rem !important;
     }
-    section[data-testid="stSidebar"] [data-testid="stCaption"] li {
+    section[data-testid="stSidebar"] [data-testid="stCaption"] li,
+    section[data-testid="stSidebar"] [data-testid="stCaptionContainer"] li,
+    section[data-testid="stSidebar"] small li {
         margin: 0 !important;
         padding: 0 !important;
     }
