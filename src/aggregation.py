@@ -42,7 +42,7 @@ def matched_rows_to_dataframe(rows: Iterable[MatchedRow]) -> pd.DataFrame:
             "전환수": row.conversion_count,
             "유입수": row.naver_visits,
             "환불액": round(row.refund_amount, 0),
-            "메모": "",  # 광고 매니저 코멘트용 — 시트에서 직접 입력
+            "판정": "",  # 광고 매니저 최종 판정/코멘트 — 시트에서 직접 입력
         })
     return pd.DataFrame(records)
 
