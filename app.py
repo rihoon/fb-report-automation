@@ -55,7 +55,14 @@ st.markdown(
     <style>
     @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
 
-    html, body, [class*="css"] {
+    html, body, [class*="css"],
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricDelta"],
+    [data-testid="stMetricLabel"],
+    [data-testid="stDataFrame"], [data-testid="stDataFrame"] *,
+    [data-testid="stTable"], [data-testid="stTable"] *,
+    input, button, textarea, select,
+    .stMarkdown, .stMarkdown * {
         font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, "Noto Sans KR", system-ui, sans-serif !important;
         -webkit-font-smoothing: antialiased !important;
         -moz-osx-font-smoothing: grayscale !important;
