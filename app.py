@@ -53,10 +53,14 @@ st.set_page_config(
 st.markdown(
     """
     <style>
-    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css');
+    @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css');
 
     html, body, [class*="css"] {
-        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, "Noto Sans KR", system-ui, sans-serif !important;
+        -webkit-font-smoothing: antialiased !important;
+        -moz-osx-font-smoothing: grayscale !important;
+        text-rendering: optimizeLegibility !important;
+        font-feature-settings: 'tnum' on !important;
     }
     /* 사이드바와 메인 영역 상단 정렬 (날짜 설정 ↔ 페북성과보고서 자동화 같은 높이) */
     .main .block-container {
