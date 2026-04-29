@@ -33,6 +33,7 @@ from src.google_sheets import (
     append_report,
     fetch_report_from_sheet,
     fetch_validity_history,
+    get_sheet_id,
     log_manual_match,
 )
 from src.matching import match_facebook_with_naver, matching_stats
@@ -456,6 +457,35 @@ if generate_btn or st.session_state.get("report_loaded", False):
 
     st.markdown("### 광고별 상세")
 
+    # 시트 저장 + 바로가기 버튼 (광고별 상세 헤더 바로 아래)
+    _sheet_id = get_sheet_id()
+    _btn_save, _btn_link = st.columns([3, 1])
+    with _btn_save:
+        if st.button("구글 시트 누적 저장", use_container_width=True, type="primary", key="save_sheet_top"):
+            with st.spinner("구글 시트에 저장 중..."):
+                try:
+                    ok, msg = append_report(display_df, report_dt)
+                except Exception as e:
+                    ok, msg = False, f"예외 발생: {type(e).__name__}: {e}"
+            st.session_state["sheet_save_result"] = (ok, msg)
+            st.toast(msg)
+            st.rerun()
+    with _btn_link:
+        if _sheet_id:
+            st.link_button(
+                "구글시트 바로가기",
+                f"https://docs.google.com/spreadsheets/d/{_sheet_id}/edit",
+                use_container_width=True,
+            )
+
+    # 저장 결과 영구 표시
+    if "sheet_save_result" in st.session_state:
+        _ok, _msg = st.session_state["sheet_save_result"]
+        if _ok:
+            st.success(f"구글 시트: {_msg}")
+        else:
+            st.error(f"구글 시트 저장 실패: {_msg}")
+
     available_owners = sorted(display_df["담당자"].unique())
     if available_owners:
         tabs = st.tabs(["전체"] + [str(o) for o in available_owners])
@@ -600,28 +630,6 @@ if generate_btn or st.session_state.get("report_loaded", False):
                     log_manual_match("/".join(key), ad_name, user="user", reason="수동 매칭")
                 st.success(f"{len(new_overrides)}건 매칭 적용됨. 새로고침하면 반영됩니다.")
                 st.rerun()
-
-    # ────────────────────── 시트 동기화 ──────────────────────
-
-    st.divider()
-
-    if st.button("구글 시트 누적 저장", use_container_width=True, type="primary"):
-        with st.spinner("구글 시트에 저장 중..."):
-            try:
-                ok, msg = append_report(display_df, report_dt)
-            except Exception as e:
-                ok, msg = False, f"예외 발생: {type(e).__name__}: {e}"
-        st.session_state["sheet_save_result"] = (ok, msg)
-        st.toast(msg)
-        st.rerun()
-
-    # 저장 결과 영구 표시
-    if "sheet_save_result" in st.session_state:
-        ok, msg = st.session_state["sheet_save_result"]
-        if ok:
-            st.success(f"구글 시트: {msg}")
-        else:
-            st.error(f"구글 시트 저장 실패: {msg}")
 
 else:
     st.info("사이드바에서 **마케팅분석 엑셀 업로드** + **보고서 생성** 버튼을 눌러주세요.")
