@@ -82,6 +82,29 @@ def get_seven_day_window(report_date: datetime) -> tuple[datetime, datetime]:
     return start, end
 
 
+def merge_seven_day(df: pd.DataFrame, history_lookup: dict[str, dict] | None) -> pd.DataFrame:
+    """광고이름 기준으로 7일 누적 광고비/매출/ROAS 컬럼 추가.
+
+    history_lookup 데이터는 구글 시트 누적 보고서에서 산출됨 (fetch_validity_history).
+    """
+    df = df.copy()
+    spends: list = []
+    revenues: list = []
+    roases: list = []
+    for ad_name in df["광고이름"]:
+        h = (history_lookup or {}).get(ad_name, {})
+        spend = float(h.get("7d_spend", 0) or 0)
+        revenue = float(h.get("7d_revenue", 0) or 0)
+        roas = float(h.get("7d_roas", 0) or 0)
+        spends.append(round(spend, 0) if spend else pd.NA)
+        revenues.append(round(revenue, 0) if revenue else pd.NA)
+        roases.append(round(roas, 0) if spend > 0 else pd.NA)
+    df["7일지출"] = spends
+    df["7일매출"] = revenues
+    df["7일ROAS"] = roases
+    return df
+
+
 def aggregate_kpi(df: pd.DataFrame) -> dict:
     """전체 KPI 4종 집계."""
     if df.empty:

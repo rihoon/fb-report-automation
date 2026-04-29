@@ -106,35 +106,87 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
             ws = spreadsheet.add_worksheet(title=sheet_name, rows=2000, cols=40)
 
         weekday = ["월", "화", "수", "목", "금", "토", "일"][report_date.weekday()]
+        # 꺼진 광고 분리:
+        #   - 게재상태 != active 이고 매출 == 0 → 시트에서 제외 (저장 안 함)
+        #   - 게재상태 != active 이고 매출 > 0 → 맨 아래 별도 섹션 (연한 회색)
+        # 매출 컬럼은 라벨 변경 후일 수 있어 동적으로 탐색 (예: "2일매출", "3일매출", "5일매출")
+        primary_revenue_col = None
+        for c in df.columns:
+            cs = str(c)
+            if cs.endswith("매출") and cs != "7일매출" and not cs.startswith("작년") and not cs.startswith("지난주"):
+                primary_revenue_col = c
+                break
+        if primary_revenue_col is None and "매출" in df.columns:
+            primary_revenue_col = "매출"
+
+        if "게재상태" in df.columns and primary_revenue_col is not None:
+            is_active = df["게재상태"].astype(str).str.lower() == "active"
+            has_revenue = df[primary_revenue_col].fillna(0).astype(float) > 0
+            active_df = df[is_active].copy()
+            inactive_with_revenue = df[(~is_active) & has_revenue].copy()
+            # 꺼진 광고 + 매출 0 → 완전히 제외
+        else:
+            active_df = df.copy()
+            inactive_with_revenue = df.iloc[0:0].copy()
+
         # 컬럼 정리
         # 1) 제외: 담당자(섹션 타이틀에 있음), 매칭방식, 게재상태(켜진 것만), 환불액, 작년/지난주 비교 컬럼
         # 2) nt_* 4개는 맨 뒤로 이동 (참고용)
+        # 3) 표시 순서는 formatting.display_column_order 사용 (1일지출→N일→7일→유효...)
+        from src.formatting import display_column_order
+
         columns_all = list(df.columns)
         EXCLUDED = {
             "담당자", "매칭방식", "게재상태", "환불액",
             "작년매출", "작년ROAS", "작년대비", "지난주매출", "지난주대비",
         }
         NT_COLS = ["nt_source", "nt_medium", "nt_detail", "nt_keyword"]
-        front = [c for c in columns_all if c not in EXCLUDED and c not in NT_COLS]
+
+        # 동적 days 추론: 컬럼명에서 "N일지출" (N=2~6) 패턴 찾기
+        days_inferred = 2
+        for c in columns_all:
+            if c.endswith("지출") and c not in {"1일지출", "7일지출"}:
+                try:
+                    days_inferred = int(c.replace("일지출", ""))
+                    break
+                except ValueError:
+                    pass
+
+        preferred_order = display_column_order(days_inferred)
+        front = [c for c in preferred_order if c in columns_all and c not in EXCLUDED and c not in NT_COLS]
+        # display_column_order에 없는 컬럼은 뒤에 (호환)
+        leftover = [c for c in columns_all if c not in front and c not in EXCLUDED and c not in NT_COLS]
         back = [c for c in NT_COLS if c in columns_all]
-        columns = front + back
+        columns = front + leftover + back
         n_cols = len(columns)
 
-        spend_col = next((c for c in columns if c.endswith("지출") and c != "1일지출"), None)
-        revenue_col = next((c for c in columns if c.endswith("매출") and not c.startswith("작년") and not c.startswith("지난주")), None)
+        spend_col = next((c for c in columns if c.endswith("지출") and c not in {"1일지출", "7일지출"}), None)
+        revenue_col = next(
+            (c for c in columns
+             if c.endswith("매출")
+             and c != "7일매출"
+             and not c.startswith("작년") and not c.startswith("지난주")),
+            None,
+        )
+        roas_col = next(
+            (c for c in columns
+             if c.endswith("ROAS") and c != "7일ROAS" and c != "작년ROAS"),
+            "ROAS",
+        )
 
         new_rows: list[list] = []
         header_row_indices: list[int] = []      # 회색 — 컬럼 헤더 행
         pink_row_indices: list[int] = []        # 연한 분홍 — 데이터 행 ROAS≥100
         deep_pink_row_indices: list[int] = []   # 진한 분홍 — 담당자 소계 ROAS≥100
         sky_row_indices: list[int] = []         # 하늘색 — 담당자 소계 ROAS<100
+        light_gray_row_indices: list[int] = []  # 연한 회색 — 꺼진 광고 (매출 있음)
 
-        section_title = f"▣ 보고일 {report_date.strftime('%Y-%m-%d')} ({weekday}) — 집계 {df.shape[0]}건"
+        section_title = f"▣ 보고일 {report_date.strftime('%Y-%m-%d')} ({weekday}) — 집계 {active_df.shape[0]}건"
         new_rows.append([section_title] + [""] * (n_cols - 1))
         new_rows.append([""] * n_cols)
 
-        for owner in sorted(df["담당자"].dropna().unique()):
-            group = df[df["담당자"] == owner]
+        for owner in sorted(active_df["담당자"].dropna().unique()):
+            group = active_df[active_df["담당자"] == owner]
             if group.empty:
                 continue
 
@@ -147,7 +199,7 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
                 formatted = [_format_cell(c, row[c]) for c in columns]
                 new_rows.append(formatted)
                 # ROAS≥100 → 행 전체 분홍 칠
-                raw_roas = row.get("ROAS")
+                raw_roas = row.get(roas_col) if roas_col in row else row.get("ROAS")
                 try:
                     if raw_roas is not None and not pd.isna(raw_roas):
                         v = float(raw_roas)
@@ -159,7 +211,8 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
             total_spend = float(group[spend_col].sum()) if spend_col and spend_col in group else 0
             total_revenue = float(group[revenue_col].sum()) if revenue_col and revenue_col in group else 0
             roas = (total_revenue / total_spend * 100) if total_spend else 0
-            total_conv = int(group["전환수"].sum()) if "전환수" in group else 0
+            conv_col = next((c for c in columns if c.endswith("전환수")), "전환수")
+            total_conv = int(group[conv_col].sum()) if conv_col in group else 0
             subtotal_row = [""] * n_cols
             subtotal_row[0] = f"{owner} 소계"
             col_pos = {name: i for i, name in enumerate(columns)}  # 0-indexed
@@ -167,10 +220,10 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
                 subtotal_row[col_pos[spend_col]] = _format_cell(spend_col, total_spend)
             if revenue_col and revenue_col in col_pos:
                 subtotal_row[col_pos[revenue_col]] = _format_cell(revenue_col, total_revenue)
-            if "ROAS" in col_pos:
-                subtotal_row[col_pos["ROAS"]] = _format_cell("ROAS", roas)
-            if "전환수" in col_pos:
-                subtotal_row[col_pos["전환수"]] = _format_cell("전환수", total_conv)
+            if roas_col in col_pos:
+                subtotal_row[col_pos[roas_col]] = _format_cell(roas_col, roas)
+            if conv_col in col_pos:
+                subtotal_row[col_pos[conv_col]] = _format_cell(conv_col, total_conv)
             new_rows.append(subtotal_row)
             subtotal_row_idx = len(new_rows)
             # 소계 ROAS ≥100% → 진한 분홍, <100% → 하늘색
@@ -183,12 +236,23 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
                 pass
             new_rows.append([""] * n_cols)
 
+        # 꺼진 광고 (매출 있음) 섹션 — 맨 아래 + 연한 회색
+        if not inactive_with_revenue.empty:
+            new_rows.append([f"▶ 꺼진 광고 (매출 있음, {len(inactive_with_revenue)}건)"] + [""] * (n_cols - 1))
+            new_rows.append(list(columns))
+            header_row_indices.append(len(new_rows))
+            for _, row in inactive_with_revenue.iterrows():
+                formatted = [_format_cell(c, row[c]) for c in columns]
+                new_rows.append(formatted)
+                light_gray_row_indices.append(len(new_rows))
+
         if new_rows:
             ws.append_rows(new_rows, value_input_option="USER_ENTERED")
 
         # 색상 적용
         try:
             LIGHT_GRAY = {"backgroundColor": {"red": 0.92, "green": 0.92, "blue": 0.92}}
+            VERY_LIGHT_GRAY = {"backgroundColor": {"red": 0.96, "green": 0.96, "blue": 0.96}}
             LIGHT_PINK = {"backgroundColor": {"red": 1.0, "green": 0.91, "blue": 0.95}}
             DEEP_PINK = {"backgroundColor": {"red": 0.98, "green": 0.73, "blue": 0.83}}
             SKY = {"backgroundColor": {"red": 0.85, "green": 0.92, "blue": 1.0}}
@@ -202,6 +266,8 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
                 formats.append({"range": f"A{row_idx}:{last_col}{row_idx}", "format": DEEP_PINK})
             for row_idx in sky_row_indices:
                 formats.append({"range": f"A{row_idx}:{last_col}{row_idx}", "format": SKY})
+            for row_idx in light_gray_row_indices:
+                formats.append({"range": f"A{row_idx}:{last_col}{row_idx}", "format": VERY_LIGHT_GRAY})
             if formats:
                 ws.batch_format(formats)
         except Exception:
@@ -210,7 +276,8 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
         n_pink = len(pink_row_indices) + len(deep_pink_row_indices)
         return True, (
             f"'{sheet_name}' 탭에 저장됨 ({len(new_rows)}행 / "
-            f"회색 {len(header_row_indices)} / 분홍 {n_pink} / 하늘 {len(sky_row_indices)})"
+            f"분홍 {n_pink} / 하늘 {len(sky_row_indices)} / "
+            f"꺼진광고매출있음 {len(light_gray_row_indices)})"
         )
     except Exception as e:
         return False, f"시트 저장 실패: {e}"
@@ -276,8 +343,15 @@ def fetch_validity_history(report_date: datetime, lookback_days: int = 7) -> dic
             first = (row[0] or "").strip()
             if not ad_name or first.endswith("소계") or first.startswith("===") or first.startswith("▣") or first.startswith("▶"):
                 continue
-            spend = _read_money(row_dict, ("지출", "1일지출", "2일지출", "3일지출"))
-            revenue = _read_money(row_dict, ("매출", "1일매출", "2일매출", "3일매출"))
+            # N일지출/매출만 합산 (1일지출=일평균, 7일지출/매출=누적값이라 중복합산 방지로 제외)
+            spend = _read_money(
+                row_dict,
+                ("지출", "2일지출", "3일지출", "4일지출", "5일지출", "6일지출"),
+            )
+            revenue = _read_money(
+                row_dict,
+                ("매출", "2일매출", "3일매출", "4일매출", "5일매출", "6일매출"),
+            )
             ex = grouped.setdefault(ad_name, {"spend": 0.0, "revenue": 0.0, "dates": set()})
             ex["spend"] += spend
             ex["revenue"] += revenue
@@ -347,15 +421,27 @@ def fetch_report_from_sheet(report_date: datetime) -> pd.DataFrame:
         row_dict = {current_header[i]: row[i] for i in range(min(len(current_header), len(row))) if current_header[i]}
         if not str(row_dict.get("광고이름", "")).strip():
             continue
+        # ROAS·전환수도 라벨이 N일ROAS/N일전환수로 변경됐을 수 있어 동적 탐색
+        roas_value = 0.0
+        for k in ("ROAS", "2일ROAS", "3일ROAS", "4일ROAS", "5일ROAS", "6일ROAS"):
+            if k in row_dict and row_dict[k]:
+                roas_value = _parse_pct(row_dict[k])
+                break
+        conv_value = 0
+        for k in ("전환수", "2일전환수", "3일전환수", "4일전환수", "5일전환수", "6일전환수"):
+            if k in row_dict and row_dict[k]:
+                conv_value = _parse_int(row_dict[k])
+                break
+
         record = {
             "담당자": current_owner,
             "캠페인명": row_dict.get("캠페인명", ""),
             "광고세트": row_dict.get("광고세트", ""),
             "광고이름": str(row_dict.get("광고이름", "")).strip(),
-            "지출": _read_money(row_dict, ("지출", "1일지출", "2일지출", "3일지출")),
-            "매출": _read_money(row_dict, ("매출", "1일매출", "2일매출", "3일매출")),
-            "ROAS": _parse_pct(row_dict.get("ROAS", 0)),
-            "전환수": _parse_int(row_dict.get("전환수", 0)),
+            "지출": _read_money(row_dict, ("지출", "2일지출", "3일지출", "4일지출", "5일지출", "6일지출")),
+            "매출": _read_money(row_dict, ("매출", "2일매출", "3일매출", "4일매출", "5일매출", "6일매출")),
+            "ROAS": roas_value,
+            "전환수": conv_value,
         }
         records.append(record)
     return pd.DataFrame(records)
@@ -444,8 +530,16 @@ def _to_value(v):
     return v
 
 
-_PCT_COLS = {"ROAS", "작년대비", "지난주대비", "작년ROAS"}
+_PCT_COLS = {"ROAS", "작년대비", "지난주대비", "작년ROAS", "7일ROAS"}
 _INT_COLS = {"전환수", "클릭", "노출", "도달", "유입수"}
+
+
+def _is_pct(name: str) -> bool:
+    return name in _PCT_COLS or name.endswith("ROAS")
+
+
+def _is_int_count(name: str) -> bool:
+    return name in _INT_COLS or name.endswith("전환수") or name.endswith("유입수")
 
 
 def _format_cell(col_name: str, v):
@@ -461,12 +555,18 @@ def _format_cell(col_name: str, v):
         return ""
     if isinstance(v, float):
         if v == float("inf"):
-            return "∞%" if col_name in _PCT_COLS else "∞"
+            return "∞%" if _is_pct(col_name) else "∞"
         if v == float("-inf"):
             return "-∞"
         if v != v:
             return ""
     name = str(col_name)
+    # 퍼센트 (N일ROAS, 작년/지난주 비교) — 돈 컬럼보다 먼저 체크 (ROAS는 돈 아님)
+    if _is_pct(name):
+        try:
+            return f"{int(float(v)):,}%"
+        except (ValueError, TypeError):
+            return _to_value(v)
     # 돈 단위 (지출/매출 + N일지출 N일매출 + 환불/CPC/CPM)
     if (name.endswith("지출") or name.endswith("매출")
             or name in {"환불액", "CPC", "CPM"}):
@@ -474,12 +574,7 @@ def _format_cell(col_name: str, v):
             return f"₩{int(float(v)):,}"
         except (ValueError, TypeError):
             return _to_value(v)
-    if name in _PCT_COLS:
-        try:
-            return f"{int(float(v)):,}%"
-        except (ValueError, TypeError):
-            return _to_value(v)
-    if name in _INT_COLS:
+    if _is_int_count(name):
         try:
             return f"{int(float(v)):,}"
         except (ValueError, TypeError):

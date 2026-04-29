@@ -18,3 +18,8 @@ Thumbs.db
 마키팅분석_*.xlsx
 *.xlsx
 !docs/sample_*.xlsx
+
+# 실행파일/바이너리
+*.exe
+*.dll
+*.msi

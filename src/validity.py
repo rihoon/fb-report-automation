@@ -21,17 +21,22 @@ def evaluate_validity(
     ad_name: str,
     history_7d_roas: float,
     has_enough_history: bool,
+    history_7d_spend: float = 0.0,
 ) -> tuple[str, str]:
     """광고 1건의 유효성 판정.
 
     Args:
         history_7d_roas: 최근 7일 ROAS (%).
         has_enough_history: 7일치 데이터가 충분히 누적됐는지.
+        history_7d_spend: 최근 7일 광고비 (데이터 부족 판정용).
 
     Returns:
         (status, reason) — status ∈ {"O", "X", "러닝중"}
     """
     if not has_enough_history:
+        # 7일 누적 광고비도 0이면 "데이터 부족" (시트에 이력 자체가 없음)
+        if history_7d_spend <= 0:
+            return "러닝중", "데이터 부족"
         return "러닝중", "머신러닝 단계"
     if history_7d_roas < 80:
         return "X", "7일간 전환율80%미만"
@@ -46,8 +51,8 @@ def annotate_validity(
 
     Args:
         df: aggregation의 결과 DataFrame.
-        history_lookup: {광고이름: {"5d_revenue": ..., "10d_roas": ..., "days_running": ...}}
-                        없으면 현재 보고서 데이터로 fallback (정확하지 않음).
+        history_lookup: {광고이름: {"7d_revenue": ..., "7d_spend": ..., "7d_roas": ..., "has_enough_history": ...}}
+                        없으면 모든 행을 "데이터 부족"으로 처리.
     """
     df = df.copy()
     statuses: list[str] = []
@@ -61,10 +66,11 @@ def annotate_validity(
                 ad_name,
                 h.get("7d_roas", 0),
                 h.get("has_enough_history", False),
+                h.get("7d_spend", 0),
             )
         else:
-            # 누적 시트에 이력 없음 → 러닝중
-            status, reason = "러닝중", "머신러닝 단계"
+            # 누적 시트에 이력 자체가 없음 → 데이터 부족
+            status, reason = "러닝중", "데이터 부족"
         statuses.append(status)
         reasons.append(reason)
 

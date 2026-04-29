@@ -110,9 +110,10 @@ def _fetch_real(
 
     insights = list(account.get_insights(fields=fields, params=params))
 
-    # ad_id별 link_url 조회 (creative에서)
+    # ad_id별 link_url + effective_status 조회
     ad_ids = list({row.get("ad_id") for row in insights if row.get("ad_id")})
     link_url_by_ad_id = _fetch_ad_link_urls(ad_ids)
+    status_by_ad_id = _fetch_ad_statuses(ad_ids)
 
     results = []
     for row in insights:
@@ -124,13 +125,17 @@ def _fetch_real(
             campaign_name=row.get("campaign_name", ""),
         )
 
+        # effective_status: ACTIVE만 active, 나머지(PAUSED/DELETED/ARCHIVED 등) inactive
+        raw_status = status_by_ad_id.get(ad_id, "ACTIVE")
+        delivery_status = "active" if str(raw_status).upper() == "ACTIVE" else "inactive"
+
         results.append(
             FacebookAd(
                 owner=owner,
                 campaign_name=row.get("campaign_name", ""),
                 adset_name=row.get("adset_name", ""),
                 ad_name=row.get("ad_name", ""),
-                delivery_status="active",
+                delivery_status=delivery_status,
                 reach=int(row.get("reach", 0)),
                 clicks=int(row.get("clicks", 0)),
                 impressions=int(row.get("impressions", 0)),
@@ -152,6 +157,26 @@ _link_url_debug: dict = {"errors": [], "samples": []}
 
 def get_link_url_debug() -> dict:
     return _link_url_debug
+
+
+def _fetch_ad_statuses(ad_ids: list[str]) -> dict[str, str]:
+    """ad_id별 effective_status 조회.
+
+    ACTIVE → 켜진 광고
+    PAUSED / DELETED / ARCHIVED / DISAPPROVED 등 → 꺼진 광고
+
+    실패하면 ACTIVE로 fallback (보고서에서 빠지지 않도록).
+    """
+    from facebook_business.adobjects.ad import Ad
+    result: dict[str, str] = {}
+    for ad_id in ad_ids:
+        try:
+            ad = Ad(ad_id).api_get(fields=[Ad.Field.effective_status])
+            status = ad.get("effective_status") or "ACTIVE"
+            result[ad_id] = str(status)
+        except Exception:
+            result[ad_id] = "ACTIVE"
+    return result
 
 
 def _fetch_ad_link_urls(ad_ids: list[str]) -> dict[str, str]:

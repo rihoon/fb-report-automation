@@ -17,6 +17,7 @@ from src.aggregation import (
     aggregate_kpi,
     get_collection_period,
     matched_rows_to_dataframe,
+    merge_seven_day,
 )
 from src.auth import check_password
 from src.comparison import (
@@ -81,11 +82,31 @@ today = date.today()
 report_date = st.sidebar.date_input("보고일", value=today, format="YYYY-MM-DD")
 report_dt = datetime.combine(report_date, datetime.min.time())
 
-start, end, days = get_collection_period(report_dt)
+# 요일별 자동 집계 일수 (월=3, 수=2, 금=2, 그 외=1)
+auto_start, auto_end, auto_days = get_collection_period(report_dt)
 weekday_label = ["월", "화", "수", "목", "금", "토", "일"][report_dt.weekday()]
+
+# 집계 일수 직접 변경 가능 (연휴 등)
+days = st.sidebar.number_input(
+    f"📅 집계 일수 (자동: {auto_days}일)",
+    min_value=1,
+    max_value=14,
+    value=int(auto_days),
+    step=1,
+    help="기본값은 요일 기준 자동 산출. 연휴나 특수 케이스에선 직접 변경하세요.",
+)
+
+# days가 변경되면 종료일 고정(보고일 전날 23:59:59), 시작일만 재계산
+end = auto_end
+start_day = end - timedelta(days=int(days) - 1)
+start = datetime(start_day.year, start_day.month, start_day.day, 0, 0, 0)
+
+# 자동값과 다르면 표시 강조
+caption_label = f"**{weekday_label}요일** 기준"
+if int(days) != int(auto_days):
+    caption_label += f" (자동 {auto_days}일 → 직접 {days}일로 변경)"
 st.sidebar.caption(
-    f"**{weekday_label}요일** 기준 자동 집계: "
-    f"{start.strftime('%m/%d')} ~ {end.strftime('%m/%d')} ({days}일)"
+    f"{caption_label}: {start.strftime('%m/%d')} ~ {end.strftime('%m/%d')} ({days}일)"
 )
 
 st.sidebar.divider()
@@ -191,10 +212,13 @@ if generate_btn or st.session_state.get("report_loaded", False):
     history = fetch_validity_history(report_dt, lookback_days=7) if not use_mock else {}
     merged_df = annotate_validity(merged_df, history_lookup=history if history else None)
 
+    # 7일 누적 컬럼 (7일지출/7일매출/7일ROAS) 추가 — 같은 history_lookup 사용
+    merged_df = merge_seven_day(merged_df, history)
+
     if selected_owners:
         merged_df = merged_df[merged_df["담당자"].isin(selected_owners)]
 
-    display_df = apply_period_labels(merged_df, days)
+    display_df = apply_period_labels(merged_df, int(days))
 
     # ────────────────────── KPI 카드 ──────────────────────
 
