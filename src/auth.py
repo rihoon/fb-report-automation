@@ -12,13 +12,22 @@ def check_password() -> bool:
     if st.session_state.get("password_correct", False):
         return True
 
-    # 로그인 화면 — 사이드바 숨김 + 중앙 정렬
+    # 로그인 화면 — 사이드바 숨김 + 화면 정중앙 정렬
     st.markdown(
         """
         <style>
         section[data-testid="stSidebar"] { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
-        .main .block-container { padding-top: 8rem !important; max-width: 100% !important; }
+        /* 메인 컨테이너를 뷰포트 높이만큼 잡고 flex로 수직 중앙 정렬 */
+        .main .block-container {
+            padding-top: 0 !important;
+            padding-bottom: 0 !important;
+            max-width: 100% !important;
+            min-height: calc(100vh - 4rem);
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: center !important;
+        }
         /* 비번 입력창 연한 회색 테두리 */
         [data-testid="stTextInput"] [data-baseweb="input"] {
             border: 1px solid #D1D5DB !important;
