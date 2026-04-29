@@ -310,7 +310,7 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
         except Exception:
             pass  # 색상 실패해도 데이터는 저장됨
 
-        # 컬럼 너비 조정: 모든 컬럼 자동 맞춤 → 광고세트/광고이름만 200px 고정
+        # 컬럼 너비 조정: 모든 컬럼 자동 맞춤 → 일부 컬럼은 고정 픽셀
         try:
             width_requests = [{
                 "autoResizeDimensions": {
@@ -322,7 +322,14 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
                     }
                 }
             }]
-            for fixed_col in ("광고세트", "광고이름"):
+            fixed_widths = {
+                "캠페인명": 75,
+                "광고세트": 200,
+                "광고이름": 200,
+                "유효": 50,
+                "유효사유": 140,
+            }
+            for fixed_col, px in fixed_widths.items():
                 if fixed_col in columns:
                     col_idx = columns.index(fixed_col)
                     width_requests.append({
@@ -333,7 +340,7 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
                                 "startIndex": col_idx,
                                 "endIndex": col_idx + 1,
                             },
-                            "properties": {"pixelSize": 200},
+                            "properties": {"pixelSize": px},
                             "fields": "pixelSize",
                         }
                     })
