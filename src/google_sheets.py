@@ -256,10 +256,46 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
             LIGHT_PINK = {"backgroundColor": {"red": 1.0, "green": 0.91, "blue": 0.95}}
             DEEP_PINK = {"backgroundColor": {"red": 0.98, "green": 0.73, "blue": 0.83}}
             SKY = {"backgroundColor": {"red": 0.85, "green": 0.92, "blue": 1.0}}
+            LIGHT_GREEN = {"backgroundColor": {"red": 0.83, "green": 0.96, "blue": 0.79}}   # 연두 (N일 컬럼 헤더)
+            LIGHT_BLUE = {"backgroundColor": {"red": 0.78, "green": 0.92, "blue": 0.99}}    # 하늘 (7일 컬럼 헤더)
             formats = []
             last_col = _col_letter(n_cols)
+
+            # 1) 전체 헤더 행 회색
             for row_idx in header_row_indices:
                 formats.append({"range": f"A{row_idx}:{last_col}{row_idx}", "format": LIGHT_GRAY})
+
+            # 2) 헤더 중 N일 컬럼은 연두색으로 덮어씀
+            n_day_col_names = [
+                f"{days_inferred}일지출",
+                f"{days_inferred}일매출",
+                f"{days_inferred}일전환수",
+                f"{days_inferred}일유입수",
+                f"{days_inferred}일ROAS",
+            ]
+            n_day_indices = [columns.index(c) for c in n_day_col_names if c in columns]
+            if n_day_indices:
+                ng_start = _col_letter(min(n_day_indices) + 1)
+                ng_end = _col_letter(max(n_day_indices) + 1)
+                for row_idx in header_row_indices:
+                    formats.append({
+                        "range": f"{ng_start}{row_idx}:{ng_end}{row_idx}",
+                        "format": LIGHT_GREEN,
+                    })
+
+            # 3) 헤더 중 7일 컬럼은 하늘색으로 덮어씀
+            seven_day_names = ["7일지출", "7일매출", "7일ROAS"]
+            seven_indices = [columns.index(c) for c in seven_day_names if c in columns]
+            if seven_indices:
+                sb_start = _col_letter(min(seven_indices) + 1)
+                sb_end = _col_letter(max(seven_indices) + 1)
+                for row_idx in header_row_indices:
+                    formats.append({
+                        "range": f"{sb_start}{row_idx}:{sb_end}{row_idx}",
+                        "format": LIGHT_BLUE,
+                    })
+
+            # 4) 데이터 행 색상 (순서: pink → deep_pink → sky → light_gray)
             for row_idx in pink_row_indices:
                 formats.append({"range": f"A{row_idx}:{last_col}{row_idx}", "format": LIGHT_PINK})
             for row_idx in deep_pink_row_indices:
@@ -268,6 +304,7 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
                 formats.append({"range": f"A{row_idx}:{last_col}{row_idx}", "format": SKY})
             for row_idx in light_gray_row_indices:
                 formats.append({"range": f"A{row_idx}:{last_col}{row_idx}", "format": VERY_LIGHT_GRAY})
+
             if formats:
                 ws.batch_format(formats)
         except Exception:
