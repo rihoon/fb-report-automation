@@ -184,8 +184,12 @@ st.markdown(
     }
     .stMetric { background: #FAFAFA; border-radius: 12px; padding: 16px; }
     .stMetric label { color: #666666 !important; font-size: 13px !important; }
-    .stMetric [data-testid="stMetricValue"] { color: #111111 !important; font-weight: 700 !important; }
-    div[data-testid="stMetricDelta"] { font-weight: 600; }
+    .stMetric [data-testid="stMetricValue"] {
+        color: #111111 !important;
+        font-weight: 700 !important;
+        font-size: 1.5rem !important;
+    }
+    div[data-testid="stMetricDelta"] { font-weight: 600; font-size: 12px !important; }
     </style>
     """,
     unsafe_allow_html=True,
