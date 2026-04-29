@@ -68,6 +68,40 @@ def get_sheet_id() -> str | None:
         return None
 
 
+def get_latest_sheet_url(report_date: datetime | None = None) -> str | None:
+    """가장 최근 MMDD 탭을 가리키는 구글 시트 URL 반환.
+
+    1. report_date에 해당하는 MMDD 탭이 있으면 그걸로 (오늘 저장된 시트)
+    2. 없으면 모든 MMDD 탭 중 가장 큰 MMDD (연말연초 경계는 무시)
+    3. MMDD 탭이 하나도 없으면 스프레드시트 루트 URL
+    """
+    sheet_id = get_sheet_id()
+    if not sheet_id:
+        return None
+    base_url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
+    client = get_gspread_client()
+    if not client:
+        return base_url
+    try:
+        spreadsheet = client.open_by_key(sheet_id)
+        # 1순위: 보고일에 해당하는 MMDD 탭
+        if report_date is not None:
+            try:
+                ws = spreadsheet.worksheet(report_date.strftime("%m%d"))
+                return f"{base_url}#gid={ws.id}"
+            except Exception:
+                pass
+        # 2순위: 모든 MMDD 탭 중 최신
+        worksheets = spreadsheet.worksheets()
+        mmdd = [w for w in worksheets if w.title.strip().isdigit() and len(w.title.strip()) == 4]
+        if not mmdd:
+            return base_url
+        latest = max(mmdd, key=lambda w: int(w.title.strip()))
+        return f"{base_url}#gid={latest.id}"
+    except Exception:
+        return base_url
+
+
 def _col_letter(n: int) -> str:
     """1-indexed 열 번호를 알파벳으로 변환 (1→A, 27→AA)."""
     result = ""

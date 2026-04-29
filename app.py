@@ -33,6 +33,7 @@ from src.google_sheets import (
     append_report,
     fetch_report_from_sheet,
     fetch_validity_history,
+    get_latest_sheet_url,
     get_sheet_id,
     log_manual_match,
 )
@@ -458,7 +459,6 @@ if generate_btn or st.session_state.get("report_loaded", False):
     st.markdown("### 광고별 상세")
 
     # 시트 저장 + 바로가기 버튼 (광고별 상세 헤더 바로 아래)
-    _sheet_id = get_sheet_id()
     _btn_save, _btn_link = st.columns([3, 1])
     with _btn_save:
         if st.button("구글 시트 누적 저장", use_container_width=True, type="primary", key="save_sheet_top"):
@@ -471,10 +471,12 @@ if generate_btn or st.session_state.get("report_loaded", False):
             st.toast(msg)
             st.rerun()
     with _btn_link:
-        if _sheet_id:
+        # 가장 최근 MMDD 탭 URL — 보고일 시트 우선, 없으면 최신 MMDD 시트
+        _sheet_url = get_latest_sheet_url(report_dt)
+        if _sheet_url:
             st.link_button(
                 "구글시트 바로가기",
-                f"https://docs.google.com/spreadsheets/d/{_sheet_id}/edit",
+                _sheet_url,
                 use_container_width=True,
             )
 
