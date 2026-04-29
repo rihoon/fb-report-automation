@@ -15,8 +15,12 @@ def check_password() -> bool:
     st.markdown("### 🔒 페북성과보고서 자동화")
     st.caption("접근하려면 비밀번호를 입력하세요.")
 
-    password = st.text_input("비밀번호", type="password", key="pw_input", label_visibility="collapsed")
-    submit = st.button("입장", use_container_width=True)
+    # st.form으로 감싸면 Enter 키 입력 시 자동 제출됨
+    with st.form("login_form", clear_on_submit=False, border=False):
+        password = st.text_input(
+            "비밀번호", type="password", key="pw_input", label_visibility="collapsed"
+        )
+        submit = st.form_submit_button("입장", use_container_width=True)
 
     if submit:
         expected = st.secrets.get("APP_PASSWORD", "")
