@@ -273,6 +273,37 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
         except Exception:
             pass  # 색상 실패해도 데이터는 저장됨
 
+        # 컬럼 너비 조정: 모든 컬럼 자동 맞춤 → 광고세트/광고이름만 200px 고정
+        try:
+            width_requests = [{
+                "autoResizeDimensions": {
+                    "dimensions": {
+                        "sheetId": ws.id,
+                        "dimension": "COLUMNS",
+                        "startIndex": 0,
+                        "endIndex": n_cols,
+                    }
+                }
+            }]
+            for fixed_col in ("광고세트", "광고이름"):
+                if fixed_col in columns:
+                    col_idx = columns.index(fixed_col)
+                    width_requests.append({
+                        "updateDimensionProperties": {
+                            "range": {
+                                "sheetId": ws.id,
+                                "dimension": "COLUMNS",
+                                "startIndex": col_idx,
+                                "endIndex": col_idx + 1,
+                            },
+                            "properties": {"pixelSize": 200},
+                            "fields": "pixelSize",
+                        }
+                    })
+            spreadsheet.batch_update({"requests": width_requests})
+        except Exception:
+            pass  # 너비 조정 실패해도 데이터는 저장됨
+
         n_pink = len(pink_row_indices) + len(deep_pink_row_indices)
         return True, (
             f"'{sheet_name}' 탭에 저장됨 ({len(new_rows)}행 / "
