@@ -75,14 +75,17 @@ st.markdown(
         padding-top: 0 !important;
         line-height: 1.2;
     }
-    /* 사이드바 첫 헤더(날짜 설정) — 메인 타이틀과 같은 크기/굵기 + 상단 정렬 */
-    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] h3:first-child {
-        font-size: 1.5rem !important;
-        font-weight: 700 !important;
+    /* 사이드바 헤더(날짜 설정 / 파일 업로드) — 작고 단정한 섹션 헤더 */
+    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] h3 {
+        font-size: 1rem !important;
+        font-weight: 600 !important;
         color: #111111 !important;
+        line-height: 1.3 !important;
+    }
+    /* 첫 헤더는 메인 타이틀과 상단선 맞추기 */
+    section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] h3:first-child {
         margin-top: 0 !important;
         padding-top: 0 !important;
-        line-height: 1.2 !important;
     }
     /* 메인 영역 섹션 헤더(담당자별 요약, 광고별 상세 등) — 1.5rem 통일 */
     .main .block-container h3 {
