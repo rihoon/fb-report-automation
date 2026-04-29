@@ -133,11 +133,45 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
         spreadsheet = client.open_by_key(sheet_id)
         sheet_name = report_date.strftime("%m%d")
 
+        # 재저장 시 광고 매니저가 입력한 메모를 보존하기 위해
+        # clear() 전에 기존 시트의 (광고이름 → 메모) 매핑을 추출
+        existing_memos: dict[str, str] = {}
         try:
             ws = spreadsheet.worksheet(sheet_name)
+            try:
+                _existing_rows = ws.get_all_values()
+                _current_header: list[str] | None = None
+                for _row in _existing_rows:
+                    if not _row:
+                        continue
+                    if "광고이름" in _row and "메모" in _row:
+                        _current_header = _row
+                        continue
+                    if _current_header is None:
+                        continue
+                    try:
+                        _ad_idx = _current_header.index("광고이름")
+                        _memo_idx = _current_header.index("메모")
+                    except ValueError:
+                        continue
+                    if len(_row) > max(_ad_idx, _memo_idx):
+                        _ad = (_row[_ad_idx] or "").strip()
+                        _memo = (_row[_memo_idx] or "").strip()
+                        if _ad and _memo:
+                            existing_memos[_ad] = _memo
+            except Exception:
+                pass
             ws.clear()
         except Exception:
             ws = spreadsheet.add_worksheet(title=sheet_name, rows=2000, cols=40)
+
+        # df의 메모 컬럼에 기존 메모 복원 (df 사본 수정)
+        if existing_memos and "메모" in df.columns and "광고이름" in df.columns:
+            df = df.copy()
+            df["메모"] = df.apply(
+                lambda r: existing_memos.get(str(r.get("광고이름", "")).strip(), r.get("메모", "")),
+                axis=1,
+            )
 
         weekday = ["월", "화", "수", "목", "금", "토", "일"][report_date.weekday()]
         # 꺼진 광고 분리:
@@ -362,6 +396,7 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
                 "광고이름": 200,
                 "유효": 50,
                 "유효사유": 140,
+                "메모": 200,
             }
             for fixed_col, px in fixed_widths.items():
                 if fixed_col in columns:

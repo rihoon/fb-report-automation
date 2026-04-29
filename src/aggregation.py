@@ -16,6 +16,8 @@ def matched_rows_to_dataframe(rows: Iterable[MatchedRow]) -> pd.DataFrame:
     method_label = {"exact": "정확", "partial": "분배", "manual": "수동", "": "❌"}
     for row in rows:
         ad = row.ad
+        # FB Insights time_range는 inclusive (since~until 양 끝일 모두 포함) → +1
+        period_days = max(1, (ad.date_stop - ad.date_start).days + 1)
         records.append({
             "담당자": ad.owner,
             "캠페인명": ad.campaign_name,
@@ -34,12 +36,13 @@ def matched_rows_to_dataframe(rows: Iterable[MatchedRow]) -> pd.DataFrame:
             "CPM": round(ad.cpm, 0),
             "CTR": round(ad.ctr, 2),
             "지출": round(ad.spend, 0),
-            "1일지출": round(ad.spend / max(1, (ad.date_stop - ad.date_start).days), 0),
+            "1일지출": round(ad.spend / period_days, 0),
             "매출": round(row.revenue, 0),
             "ROAS": round(row.roas, 0),
             "전환수": row.conversion_count,
             "유입수": row.naver_visits,
             "환불액": round(row.refund_amount, 0),
+            "메모": "",  # 광고 매니저 코멘트용 — 시트에서 직접 입력
         })
     return pd.DataFrame(records)
 
