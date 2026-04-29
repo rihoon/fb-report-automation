@@ -191,7 +191,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
 
     # 실제 모드인데 엑셀 없음 → 안내
     if not use_mock and uploaded_current is None:
-        st.warning("⚠️ 사이드바에서 **이번주 마케팅분석 엑셀**을 업로드해주세요. (Mock 모드를 켜면 가짜 데이터로 미리 볼 수 있어요)")
+        st.warning("⚠️ 사이드바에서 **마케팅분석 엑셀**을 업로드해주세요.")
         st.stop()
 
     with st.spinner("📡 페북 + 네이버 데이터 처리 중..."):
@@ -495,4 +495,3 @@ if generate_btn or st.session_state.get("report_loaded", False):
 
 else:
     st.info("👈 사이드바에서 **마케팅분석 엑셀 업로드** + **🚀 보고서 생성** 버튼을 눌러주세요.")
-    st.caption("Mock 모드를 켜면 엑셀 없이도 가짜 데이터로 동작 확인 가능합니다.")
