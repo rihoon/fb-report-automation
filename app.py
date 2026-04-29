@@ -94,6 +94,19 @@ st.markdown(
         border-radius: 8px !important;
         overflow: hidden;
     }
+    /* 사이드바 캡션(설명 텍스트) 폰트 사이즈/행간 축소 */
+    section[data-testid="stSidebar"] [data-testid="stCaption"] {
+        font-size: 11px !important;
+        line-height: 1.4 !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stCaption"] ul {
+        margin: 0 !important;
+        padding-left: 1rem !important;
+    }
+    section[data-testid="stSidebar"] [data-testid="stCaption"] li {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
     /* 사이드바 집계 기간 엑셀(file_uploader) — 흰 박스/설명 제거, Browse 버튼만 풀 너비 */
     section[data-testid="stSidebar"] [data-testid="stFileUploaderDropzone"],
     section[data-testid="stSidebar"] [data-testid="stFileUploadDropzone"] {
