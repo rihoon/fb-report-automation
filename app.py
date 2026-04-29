@@ -105,7 +105,7 @@ weekday_label = ["월", "화", "수", "목", "금", "토", "일"][report_dt.week
 
 # 집계 일수 직접 변경 가능 (연휴 등)
 days = st.sidebar.number_input(
-    f"📅 집계 일수 (자동: {auto_days}일)",
+    f"집계 일수 (자동: {auto_days}일)",
     min_value=1,
     max_value=14,
     value=int(auto_days),
