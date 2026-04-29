@@ -69,15 +69,20 @@ st.markdown(
     section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] {
         padding-top: 2.5rem !important;
     }
-    .main .block-container h1:first-child {
+    .main .block-container h1:first-child,
+    .main .block-container > div:first-child h1 {
         margin-top: 0 !important;
         padding-top: 0 !important;
         line-height: 1.2;
     }
+    /* 사이드바 첫 헤더(날짜 설정) — 메인 타이틀과 같은 크기/굵기 + 상단 정렬 */
     section[data-testid="stSidebar"] [data-testid="stSidebarUserContent"] h3:first-child {
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        color: #111111 !important;
         margin-top: 0 !important;
         padding-top: 0 !important;
-        line-height: 1.2;
+        line-height: 1.2 !important;
     }
     /* 사이드바 입력창 테두리 — 보고일(date_input) */
     section[data-testid="stSidebar"] [data-testid="stDateInput"] [data-baseweb="input"] {
@@ -212,7 +217,10 @@ generate_btn = st.sidebar.button("보고서 생성", use_container_width=True, t
 
 # ────────────────────── 메인 영역 ──────────────────────
 
-st.markdown("# 페북 성과보고서 오토파일럿")
+st.markdown(
+    '<h1 style="font-size: 1.5rem; font-weight: 700; margin: 0; color: #111111;">페북 성과보고서 오토파일럿</h1>',
+    unsafe_allow_html=True,
+)
 st.caption(f"보고일: **{report_date.strftime('%Y년 %m월 %d일')} ({weekday_label})** | 집계 {days}일치")
 
 
