@@ -166,12 +166,15 @@ compare_last_year = False
 selected_owners: list[str] = []  # 빈 리스트 = 전체 표시
 
 st.sidebar.markdown("### 📂 파일 업로드")
-st.sidebar.caption("스스 관리자센터 → 데이터분석 → 마케팅분석 → 사용자정의채널 → 상세보기 → 엑셀다운로드")
 
 uploaded_current = st.sidebar.file_uploader(
     "**집계 기간 엑셀**", type=["xlsx"], key="upload_current",
 )
-st.sidebar.caption("ℹ️ 지난주·작년 데이터는 구글 시트 누적 탭에서 자동 조회됩니다.")
+st.sidebar.caption(
+    "* 엑셀 파일은 500MB까지 업로드 가능\n"
+    "* 스스 관리자센터 → 데이터분석 → 마케팅분석 → 사용자정의채널 → 상세보기 → 다운로드\n"
+    "* 지난 주 데이터는 구글시트 누적탭에서 자동 조회됩니다."
+)
 
 st.sidebar.divider()
 

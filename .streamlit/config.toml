@@ -6,7 +6,7 @@ textColor = "#111827"
 font = "sans serif"
 
 [server]
-maxUploadSize = 50
+maxUploadSize = 500
 
 [browser]
 gatherUsageStats = false
