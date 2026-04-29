@@ -19,6 +19,11 @@ def check_password() -> bool:
         section[data-testid="stSidebar"] { display: none !important; }
         [data-testid="collapsedControl"] { display: none !important; }
         .main .block-container { padding-top: 8rem !important; max-width: 100% !important; }
+        /* 비번 입력창 연한 회색 테두리 */
+        [data-testid="stTextInput"] [data-baseweb="input"] {
+            border: 1px solid #D1D5DB !important;
+            border-radius: 8px !important;
+        }
         </style>
         """,
         unsafe_allow_html=True,
