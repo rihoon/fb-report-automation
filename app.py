@@ -163,14 +163,15 @@ st.markdown(
     section[data-testid="stSidebar"] [data-testid="stFileUploader"] button {
         width: 100% !important;
     }
-    /* 알림(st.info / st.warning) 박스 — 파란/노란 톤 → 중립 회색 */
+    /* 알림(st.info / st.warning) 박스 — 파란/노란 톤 → 중립 회색, 테두리 없음 */
     [data-testid="stAlert"],
     [data-testid="stAlertContentInfo"],
     [data-testid="stAlertContentWarning"],
     [data-testid="stNotification"],
     [role="alert"] {
         background-color: #FAFAFA !important;
-        border: 1px solid #E5E7EB !important;
+        border: none !important;
+        box-shadow: none !important;
         border-radius: 8px !important;
         color: #111111 !important;
     }
