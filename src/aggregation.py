@@ -10,14 +10,19 @@ import pandas as pd
 from src.matching import MatchedRow
 
 
-def matched_rows_to_dataframe(rows: Iterable[MatchedRow]) -> pd.DataFrame:
-    """매칭 결과를 DataFrame으로 변환 (기본 컬럼)."""
+def matched_rows_to_dataframe(rows: Iterable[MatchedRow], days: int = 1) -> pd.DataFrame:
+    """매칭 결과를 DataFrame으로 변환 (기본 컬럼).
+
+    Args:
+        rows: 매칭된 광고 결과 목록.
+        days: 집계 일수 — 1일지출 계산에 사용 (사용자가 지정한 보고 기간).
+              FB API의 date_start/date_stop은 1일로 들어오는 경우가 있어 신뢰 불가 → days 직접 사용.
+    """
     records = []
     method_label = {"exact": "정확", "partial": "분배", "manual": "수동", "": "❌"}
+    period_days = max(1, int(days))
     for row in rows:
         ad = row.ad
-        # FB Insights time_range는 inclusive (since~until 양 끝일 모두 포함) → +1
-        period_days = max(1, (ad.date_stop - ad.date_start).days + 1)
         records.append({
             "담당자": ad.owner,
             "캠페인명": ad.campaign_name,

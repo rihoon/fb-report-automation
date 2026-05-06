@@ -297,9 +297,9 @@ def _load_naver_data(uploaded_file, use_mock: bool, fb_ads_for_mock=None):
     return parse_naver_marketing_excel(uploaded_file.getvalue())
 
 
-def _build_report(ads_list, naver_agg, manual_overrides=None):
+def _build_report(ads_list, naver_agg, days, manual_overrides=None):
     rows, unmatched_naver = match_facebook_with_naver(ads_list, naver_agg, manual_overrides=manual_overrides)
-    df = matched_rows_to_dataframe(rows)
+    df = matched_rows_to_dataframe(rows, days=days)
     return df, unmatched_naver, rows
 
 
@@ -316,7 +316,7 @@ if generate_btn or st.session_state.get("report_loaded", False):
         ads = _load_facebook(start.isoformat(), end.isoformat(), use_mock)
         naver_agg = _load_naver_data(uploaded_current, use_mock, fb_ads_for_mock=ads)
         manual_overrides = st.session_state.get("manual_overrides", {})
-        current_df, unmatched_naver, rows_for_stats = _build_report(ads, naver_agg, manual_overrides)
+        current_df, unmatched_naver, rows_for_stats = _build_report(ads, naver_agg, int(days), manual_overrides)
 
         # 작년 동기 — 구글 시트 누적 탭에서 자동 조회
         last_year_df = pd.DataFrame()
