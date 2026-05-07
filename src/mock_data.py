@@ -129,6 +129,117 @@ GFA_ADGROUP_SUFFIXES = ["20대여성", "30대여성", "관심사_다꾸", "관�
 GFA_CREATIVE_SUFFIXES = ["배너_A", "배너_B", "이미지_A", "이미지_B", "동영상_A"]
 
 
+@dataclass
+class SearchAd:
+    """네이버 검색광고 1건 (광고그룹 단위 합산).
+
+    검색광고 API는 광고비·매출(전환금액)·전환수를 직접 제공하므로
+    스마트스토어 매출 매칭 로직 불필요.
+
+    응답 필드 매핑 (실 API 검증 완료):
+    - salesAmt → spend (광고비)
+    - convAmt  → revenue (매출 = 전환금액)
+    - ccnt     → conversion_count (전환수)
+    - impCnt   → impressions
+    - clkCnt   → clicks
+    - avgRnk   → avg_position (평균노출순위)
+    """
+    campaign_name: str
+    adgroup_name: str
+    impressions: int = 0
+    clicks: int = 0
+    spend: float = 0.0              # 광고비 (KRW)
+    conversion_count: int = 0       # 전환수
+    revenue: float = 0.0            # 전환매출 (KRW) — API 자체 제공
+    avg_position: float = 0.0       # 평균노출순위
+    date_start: datetime | None = None
+    date_stop: datetime | None = None
+    delivery_status: str = "active"
+
+    @property
+    def ctr(self) -> float:
+        return (self.clicks / self.impressions * 100) if self.impressions else 0.0
+
+    @property
+    def roas(self) -> float:
+        return (self.revenue / self.spend * 100) if self.spend else 0.0
+
+
+SEARCH_AD_CAMPAIGN_NAMES = [
+    "01.브랜드_리훈",
+    "02.다이어리_시즌",
+    "03.플래너_상시",
+    "04.노트_상시",
+    "05.오늘쓰임_브랜드",
+    "06.회사생활_파워상품",
+]
+
+SEARCH_AD_ADGROUP_SUFFIXES = [
+    "브랜드_핵심", "브랜드_연관", "겨울다이어리", "신년다이어리",
+    "이야기다이어리", "주간플래너", "초등플래너", "감성노트", "원노트",
+]
+
+
+def generate_search_ads(
+    n_ads: int = 20,
+    period_days: int = 3,
+    ref_date: datetime | None = None,
+    seed: int | None = None,
+) -> list[SearchAd]:
+    """네이버 검색광고 가짜 데이터 생성.
+
+    Args:
+        n_ads: 생성할 광고그룹 수.
+        period_days: 보고 집계 기간.
+        ref_date: 보고일 기준 (기본: 오늘).
+        seed: 재현 가능한 결과를 위한 시드.
+    """
+    rng = random.Random(seed) if seed is not None else random.Random()
+    ref = ref_date or datetime.now()
+    end = datetime(ref.year, ref.month, ref.day) - timedelta(seconds=1)
+    start = end - timedelta(days=period_days - 1)
+    start = datetime(start.year, start.month, start.day)
+
+    results: list[SearchAd] = []
+    for _ in range(n_ads):
+        campaign = rng.choice(SEARCH_AD_CAMPAIGN_NAMES)
+        adgroup_suffix = rng.choice(SEARCH_AD_ADGROUP_SUFFIXES)
+        adgroup = f"{campaign.split('.', 1)[1]}_{adgroup_suffix}"
+
+        impressions = rng.randint(500, 50000)
+        ctr_pct = rng.uniform(0.5, 6.0)  # 검색광고는 CTR 보통 더 높음 (1~5%)
+        clicks = max(1, int(impressions * ctr_pct / 100))
+        cpc = rng.uniform(50, 800)
+        spend = round(clicks * cpc, 0)
+
+        # 검색광고는 ROAS 보통 매우 높음 (브랜드/일반키워드 합쳐 100~800%)
+        roas_multiplier = rng.choice([0.5, 1.5, 3.0, 5.0, 8.0])
+        conversions = int(clicks * rng.uniform(0.05, 0.20))
+        if conversions == 0 or rng.random() < 0.10:
+            revenue = 0.0
+            conversions = 0
+        else:
+            revenue = round(spend * roas_multiplier, 0)
+
+        avg_position = round(rng.uniform(1.0, 5.0), 1)
+        delivery = rng.choices(["active", "active", "active", "paused"], k=1)[0]
+
+        results.append(SearchAd(
+            campaign_name=campaign,
+            adgroup_name=adgroup,
+            impressions=impressions,
+            clicks=clicks,
+            spend=spend,
+            conversion_count=conversions,
+            revenue=revenue,
+            avg_position=avg_position,
+            date_start=start,
+            date_stop=end,
+            delivery_status=delivery,
+        ))
+    return results
+
+
 def generate_gfa_ads(
     n_ads: int = 25,
     period_days: int = 3,
