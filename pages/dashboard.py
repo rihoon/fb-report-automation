@@ -22,7 +22,7 @@ from src.aggregation import (
 )
 from src.facebook_api import fetch_facebook_ads
 from src.formatting import apply_period_labels
-from src.gfa_api import fetch_gfa_ads
+from src.gfa_api import fetch_gfa_ads, get_data_source as gfa_data_source, get_last_debug_info as gfa_debug
 from src.google_sheets import (
     append_channel_section,
     append_report,
@@ -31,7 +31,11 @@ from src.google_sheets import (
 )
 from src.matching import match_facebook_with_naver
 from src.naver_excel import parse_naver_marketing_excel
-from src.naver_searchad_api import fetch_search_ads
+from src.naver_searchad_api import (
+    fetch_search_ads,
+    get_data_source as search_data_source,
+    get_last_debug_info as search_debug,
+)
 from src.sidebar import render_sidebar
 from src.validity import annotate_validity
 
@@ -208,6 +212,7 @@ if generate_btn or st.session_state.get("dashboard_loaded", False):
     gfa_kpi = None
     with st.spinner("GFA 처리 중..."):
         gfa_kpi = _load_gfa_kpi(start.isoformat(), end.isoformat())
+    gfa_src = gfa_data_source()
     _render_total_kpi(total_kpi_slot, fb_kpi, gfa_kpi, None)
     _render_channel_kpis(channel_kpi_slot, fb_kpi, gfa_kpi, None)
 
@@ -215,8 +220,30 @@ if generate_btn or st.session_state.get("dashboard_loaded", False):
     search_kpi = None
     with st.spinner("네이버 검색광고 처리 중 (광고그룹마다 1콜이라 1~2분 걸려요)..."):
         search_kpi = _load_search_kpi(start.isoformat(), end.isoformat())
+    search_src = search_data_source()
     _render_total_kpi(total_kpi_slot, fb_kpi, gfa_kpi, search_kpi)
     _render_channel_kpis(channel_kpi_slot, fb_kpi, gfa_kpi, search_kpi)
+
+    # ────── 데이터 출처 안내 ──────
+    src_messages: list[str] = []
+    if gfa_src == "mock":
+        src_messages.append("⚠️ **GFA: Mock 데이터** (시크릿 미설정 → 가짜 숫자)")
+    elif gfa_src == "real_empty":
+        src_messages.append("ℹ️ GFA: 실 API OK이나 데이터 없음 (광고가 없거나 endpoint 미확정)")
+    elif gfa_src == "real_error":
+        errs = gfa_debug().get("errors", [])
+        last_err = errs[-1] if errs else "알 수 없음"
+        src_messages.append(f"❌ GFA: 실 API 호출 실패 — {last_err}")
+    if search_src == "mock":
+        src_messages.append("⚠️ **검색광고: Mock 데이터** (시크릿 미설정 → 가짜 숫자)")
+    elif search_src == "real_empty":
+        src_messages.append("ℹ️ 검색광고: 실 API OK이나 데이터 없음")
+    elif search_src == "real_error":
+        errs = search_debug().get("errors", [])
+        last_err = errs[-1] if errs else "알 수 없음"
+        src_messages.append(f"❌ 검색광고: 실 API 호출 실패 — {last_err}")
+    if src_messages:
+        st.warning("\n\n".join(src_messages))
 
     # ────────────────────── 채널별 광고비 비중 (altair 막대) ──────────────────────
 

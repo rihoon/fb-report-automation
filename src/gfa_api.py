@@ -50,15 +50,23 @@ def fetch_gfa_ads(
 ) -> list:
     """GFA 성과형 광고 보고서 조회.
 
+    데이터 출처는 get_last_data_source() 로 확인 가능:
+        "real"        → 실 API 정상
+        "real_empty"  → 실 API 호출 OK이지만 데이터 없음
+        "real_error"  → 실 API 호출 실패 (에러 발생)
+        "mock"        → use_mock=True 또는 키 없음 → 가짜 데이터
+
     Args:
         start_date: 조회 시작일 (포함).
         end_date: 조회 종료일 (포함).
-        use_mock: True면 Mock 데이터 사용 (개발/테스트).
+        use_mock: True면 강제로 Mock 데이터 사용.
 
     Returns:
-        GFAAd 리스트.
+        GFAAd 리스트 (real 실패 시 빈 리스트, mock 안 떨어짐).
     """
+    global _data_source
     if use_mock:
+        _data_source = "mock"
         return _fetch_mock(start_date, end_date)
 
     try:
@@ -68,9 +76,13 @@ def fetch_gfa_ads(
         secret_key = cfg.get("SECRET_KEY")
         customer_id = cfg.get("CUSTOMER_ID")
     except (ImportError, AttributeError, KeyError):
+        _data_source = "mock"
+        _last_debug["errors"].append("Streamlit secrets 접근 실패")
         return _fetch_mock(start_date, end_date)
 
     if not all([access_key, secret_key, customer_id]):
+        _data_source = "mock"
+        _last_debug["errors"].append("[naver_gfa] 시크릿 미설정 → mock 사용")
         return _fetch_mock(start_date, end_date)
 
     return _fetch_real(start_date, end_date, access_key, secret_key, customer_id)
@@ -79,11 +91,17 @@ def fetch_gfa_ads(
 # ────────────────────── 진단 정보 ──────────────────────
 
 _last_debug: dict = {"calls": [], "errors": [], "samples": []}
+_data_source: str = "unknown"
 
 
 def get_last_debug_info() -> dict:
     """마지막 API 호출 진단 정보 (개발/디버깅용)."""
     return _last_debug
+
+
+def get_data_source() -> str:
+    """마지막 호출의 데이터 출처: real / real_empty / real_error / mock / unknown."""
+    return _data_source
 
 
 # ────────────────────── 인증 (HMAC-SHA256) ──────────────────────
@@ -172,15 +190,9 @@ def _fetch_real(
 ) -> list:
     """실제 GFA API 호출.
 
-    동작 흐름:
-    1. 캠페인 메타데이터 조회 (GET /campaigns)
-    2. 광고그룹 메타데이터 조회 (GET /adgroups)
-    3. 소재(크리에이티브) 메타데이터 조회 (GET /creatives)
-    4. 통계 보고서 조회 (POST /stats with creative IDs + 날짜 범위)
-    5. 메타 + 통계 결합 → GFAAd 리스트 반환
-
-    실패하거나 응답 비면 Mock fallback.
+    실패 시 Mock fallback 안 함 — 빈 리스트 반환 (data_source="real_error" 또는 "real_empty").
     """
+    global _data_source
     from src.mock_data import GFAAd
 
     _last_debug["calls"] = []
@@ -192,15 +204,11 @@ def _fetch_real(
     _last_debug["discovered_ad_account"] = ad_account_no
     if ad_account_no is None:
         _last_debug["errors"].append("GFA 계정 못 찾음 (adPlatformType=GFA 없음)")
-        return _fetch_mock(start_date, end_date)
+        _data_source = "real_error"
+        return []
 
-    # 1. 비동기 보고서 잡 시도 (SA 패턴 — GFA가 같은 endpoint면 동작)
-    #    실측 검증: POST /stat-reports {"reportTp":"AD_DETAIL","statDt":"YYYY-MM-DD"} → 200
-    #    응답: {"reportJobId":..., "status":"REGIST"} → 폴링 → BUILT 시 downloadUrl
-    #    현재 GFA 키로 호출 시 status=NONE (GFA 전용 endpoint 미확정)
     try:
         results: list[GFAAd] = []
-        # 기간 내 각 날짜에 대해 잡 생성 (statDt는 단일 날짜만)
         from datetime import timedelta
         for offset in range((end_date - start_date).days + 1):
             day = start_date + timedelta(days=offset)
@@ -212,11 +220,14 @@ def _fetch_real(
                 results.append(_row_to_gfa_ad(r, day, day))
         if not results:
             _last_debug["errors"].append("모든 날짜 status=NONE — GFA 데이터 없음 또는 endpoint 미확정")
-            return _fetch_mock(start_date, end_date)
+            _data_source = "real_empty"
+            return []
+        _data_source = "real"
         return results
     except Exception as e:
         _last_debug["errors"].append(f"_fetch_real: {type(e).__name__}: {e}")
-        return _fetch_mock(start_date, end_date)
+        _data_source = "real_error"
+        return []
 
 
 # 이하는 placeholder (활성화되지 않음 — TODO: GFA 메타 endpoint 확정 후 사용)

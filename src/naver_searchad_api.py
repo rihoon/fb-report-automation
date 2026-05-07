@@ -61,12 +61,15 @@ def fetch_search_ads(
     Args:
         start_date: 조회 시작일 (포함).
         end_date: 조회 종료일 (포함).
-        use_mock: True면 Mock 데이터 사용 (개발/테스트).
+        use_mock: True면 강제 Mock 데이터.
 
     Returns:
-        SearchAd 리스트 (광고그룹 단위, 기간 합산).
+        SearchAd 리스트 (real 실패 시 빈 리스트, mock 안 떨어짐).
+        데이터 출처는 get_data_source()로 확인.
     """
+    global _data_source
     if use_mock:
+        _data_source = "mock"
         return _fetch_mock(start_date, end_date)
 
     try:
@@ -76,9 +79,13 @@ def fetch_search_ads(
         secret_key = cfg.get("SECRET_KEY")
         customer_id = cfg.get("CUSTOMER_ID")
     except (ImportError, AttributeError, KeyError):
+        _data_source = "mock"
+        _last_debug["errors"].append("Streamlit secrets 접근 실패")
         return _fetch_mock(start_date, end_date)
 
     if not all([api_key, secret_key, customer_id]):
+        _data_source = "mock"
+        _last_debug["errors"].append("[naver_searchad] 시크릿 미설정 → mock 사용")
         return _fetch_mock(start_date, end_date)
 
     return _fetch_real(start_date, end_date, api_key, secret_key, str(customer_id))
@@ -87,11 +94,17 @@ def fetch_search_ads(
 # ────────────────────── 진단 정보 ──────────────────────
 
 _last_debug: dict = {"calls": [], "errors": [], "samples": []}
+_data_source: str = "unknown"
 
 
 def get_last_debug_info() -> dict:
     """마지막 API 호출 진단 정보 (개발/디버깅용)."""
     return _last_debug
+
+
+def get_data_source() -> str:
+    """마지막 호출의 데이터 출처: real / real_empty / real_error / mock / unknown."""
+    return _data_source
 
 
 # ────────────────────── 인증 (HMAC-SHA256) ──────────────────────
@@ -146,14 +159,9 @@ def _fetch_real(
 ) -> list:
     """실제 네이버 검색광고 API 호출.
 
-    동작 흐름:
-    1. 캠페인 목록 조회 (GET /ncc/campaigns)
-    2. 캠페인별 광고그룹 목록 조회 (GET /ncc/adgroups?nccCampaignId=...)
-    3. 광고그룹별 stats 조회 (GET /stats?id=...) — 일별 데이터 → 기간 합산
-    4. 메타 + 통계 결합 → SearchAd 리스트 반환
-
-    실패하거나 응답 비면 Mock fallback.
+    실패 시 Mock fallback 안 함 — 빈 리스트 반환 (data_source="real_error" 또는 "real_empty").
     """
+    global _data_source
     from src.mock_data import SearchAd
 
     _last_debug["calls"] = []
@@ -164,7 +172,8 @@ def _fetch_real(
         campaigns = _api_get(SEARCHAD_CAMPAIGNS_PATH, api_key, secret_key, customer_id)
         if not campaigns:
             _last_debug["errors"].append("캠페인 메타 비어있음")
-            return _fetch_mock(start_date, end_date)
+            _data_source = "real_empty"
+            return []
         campaign_lookup = {c["nccCampaignId"]: c.get("name", "") for c in campaigns}
 
         # 2. 캠페인별 광고그룹 모두 모음
@@ -178,7 +187,8 @@ def _fetch_real(
 
         if not adgroups:
             _last_debug["errors"].append("광고그룹 메타 비어있음")
-            return _fetch_mock(start_date, end_date)
+            _data_source = "real_empty"
+            return []
 
         # 3. 광고그룹별 stats 조회 + 메타 결합
         results: list[SearchAd] = []
@@ -209,11 +219,16 @@ def _fetch_real(
                 date_stop=end_date,
                 delivery_status=str(status_raw).lower(),
             ))
+        if not results:
+            _data_source = "real_empty"
+        else:
+            _data_source = "real"
         return results
 
     except Exception as e:
         _last_debug["errors"].append(f"{type(e).__name__}: {e}")
-        return _fetch_mock(start_date, end_date)
+        _data_source = "real_error"
+        return []
 
 
 def _api_get(
