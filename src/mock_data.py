@@ -88,6 +88,106 @@ class NaverOrder:
     is_refunded: bool = False
 
 
+@dataclass
+class GFAAd:
+    """네이버 GFA 성과형 광고 1건 (광고소재 단위).
+
+    GFA API는 광고비·매출(전환금액)·전환수를 직접 제공하므로
+    스마트스토어 매출 매칭 로직 불필요.
+    """
+    campaign_name: str
+    adgroup_name: str
+    creative_name: str
+    impressions: int = 0
+    clicks: int = 0
+    spend: float = 0.0              # 광고비 (KRW)
+    conversion_count: int = 0       # 전환수
+    revenue: float = 0.0            # 전환매출 (KRW) — API 자체 제공
+    date_start: datetime | None = None
+    date_stop: datetime | None = None
+    delivery_status: str = "active"
+
+    @property
+    def ctr(self) -> float:
+        return (self.clicks / self.impressions * 100) if self.impressions else 0.0
+
+    @property
+    def roas(self) -> float:
+        return (self.revenue / self.spend * 100) if self.spend else 0.0
+
+
+GFA_CAMPAIGN_NAMES = [
+    "GFA_2025이야기다이어리_리타겟",
+    "GFA_2025오늘쓰임_신규유입",
+    "GFA_2025회사생활_프로스펙팅",
+    "GFA_반가워겨울방학_리타겟",
+    "GFA_2025오늘기억_브랜딩",
+    "GFA_2025레이어블_컬렉션",
+]
+
+GFA_ADGROUP_SUFFIXES = ["20대여성", "30대여성", "관심사_다꾸", "관심사_문구", "유사고객"]
+GFA_CREATIVE_SUFFIXES = ["배너_A", "배너_B", "이미지_A", "이미지_B", "동영상_A"]
+
+
+def generate_gfa_ads(
+    n_ads: int = 25,
+    period_days: int = 3,
+    ref_date: datetime | None = None,
+    seed: int | None = None,
+) -> list[GFAAd]:
+    """GFA 성과형 광고 가짜 데이터 생성.
+
+    Args:
+        n_ads: 생성할 광고소재 수.
+        period_days: 보고 집계 기간.
+        ref_date: 보고일 기준 (기본: 오늘).
+        seed: 재현 가능한 결과를 위한 시드.
+    """
+    rng = random.Random(seed) if seed is not None else random.Random()
+    ref = ref_date or datetime.now()
+    end = datetime(ref.year, ref.month, ref.day) - timedelta(seconds=1)
+    start = end - timedelta(days=period_days - 1)
+    start = datetime(start.year, start.month, start.day)
+
+    results: list[GFAAd] = []
+    for _ in range(n_ads):
+        campaign = rng.choice(GFA_CAMPAIGN_NAMES)
+        adgroup = f"{campaign.split('_', 1)[1]}_{rng.choice(GFA_ADGROUP_SUFFIXES)}"
+        creative = f"{adgroup}_{rng.choice(GFA_CREATIVE_SUFFIXES)}"
+
+        impressions = rng.randint(1000, 50000)
+        ctr_pct = rng.uniform(0.3, 3.5)  # 0.3% ~ 3.5%
+        clicks = int(impressions * ctr_pct / 100)
+        cpc = rng.uniform(150, 600)
+        spend = round(clicks * cpc, 0)
+        conv_rate = rng.uniform(0.01, 0.08)
+        conversions = int(clicks * conv_rate)
+        avg_order = rng.uniform(15000, 60000)
+        # 일부는 매출 0 (전환 없음)
+        if conversions == 0 or rng.random() < 0.15:
+            revenue = 0.0
+            conversions = 0
+        else:
+            revenue = round(conversions * avg_order, 0)
+
+        delivery = rng.choices(["active", "active", "active", "paused"], k=1)[0]
+
+        results.append(GFAAd(
+            campaign_name=campaign,
+            adgroup_name=adgroup,
+            creative_name=creative,
+            impressions=impressions,
+            clicks=clicks,
+            spend=spend,
+            conversion_count=conversions,
+            revenue=revenue,
+            date_start=start,
+            date_stop=end,
+            delivery_status=delivery,
+        ))
+    return results
+
+
 def _make_campaign_id(idx: int, theme: str) -> str:
     """예: '08-12.2025이야기다이어리_1114' 형식."""
     group = f"{random.randint(1, 20):02d}-{random.randint(1, 25):02d}"
