@@ -28,14 +28,19 @@ from typing import Any
 import requests
 
 
-# GFA API 베이스 URL — 키 발급 후 공식 문서 확인하여 조정
-GFA_API_BASE = "https://api.naver.com"
+# GFA API 베이스 URL — 검색광고와 동일 도메인 (실측 검증됨)
+GFA_API_BASE = "https://api.searchad.naver.com"
 
-# 광고/통계 엔드포인트 (placeholder — 실제 키 받으면 교체)
+# 발견된 endpoint:
+# - /ad-accounts: GET → 계정 목록 (adPlatformType="GFA"인 항목 자동 검출)
+# - /stat-reports: POST → 통계 (정확한 schema는 공식 문서 필요, 11001 에러 반환 중)
+GFA_AD_ACCOUNTS_PATH = "/ad-accounts"
+GFA_STATS_PATH = "/stat-reports"
+
+# 메타데이터 endpoint placeholder — 실제 path 미확정 (TODO: 공식 문서)
 GFA_CAMPAIGNS_PATH = "/gfa/v1/campaigns"
 GFA_ADGROUPS_PATH = "/gfa/v1/adgroups"
 GFA_CREATIVES_PATH = "/gfa/v1/creatives"
-GFA_STATS_PATH = "/gfa/v1/stats"
 
 
 def fetch_gfa_ads(
@@ -122,6 +127,40 @@ def _build_auth_headers(
     }
 
 
+# ────────────────────── GFA adAccountNo 자동 검출 ──────────────────────
+
+def discover_gfa_ad_account(
+    access_key: str,
+    secret_key: str,
+    customer_id: str,
+) -> int | None:
+    """master customer 아래의 모든 광고계정 중 adPlatformType="GFA"인 계정 번호 반환.
+
+    실측 응답 예시:
+        {"content": [
+            {"adAccountNo": 1720164, "adAccount": {"adPlatformType": "SA", ...}},
+            {"adAccountNo": 8489,    "adAccount": {"adPlatformType": "GFA", ...}}
+        ]}
+
+    Returns:
+        adAccountNo (int) — GFA 계정 번호. 없으면 None.
+    """
+    try:
+        accounts = _api_get(GFA_AD_ACCOUNTS_PATH, access_key, secret_key, customer_id)
+        if not isinstance(accounts, list):
+            return None
+        for acc in accounts:
+            ad_account = acc.get("adAccount", {}) if isinstance(acc, dict) else {}
+            if ad_account.get("adPlatformType") == "GFA":
+                no = acc.get("adAccountNo") or ad_account.get("no")
+                if no is not None:
+                    return int(no)
+        return None
+    except Exception as e:
+        _last_debug["errors"].append(f"discover_gfa_ad_account: {type(e).__name__}: {e}")
+        return None
+
+
 # ────────────────────── 실제 API 호출 ──────────────────────
 
 def _fetch_real(
@@ -146,9 +185,17 @@ def _fetch_real(
 
     _last_debug["calls"] = []
     _last_debug["errors"] = []
+    _last_debug["discovered_ad_account"] = None
+
+    # 0. GFA adAccountNo 자동 검출 (master customer 아래 GFA 계정)
+    ad_account_no = discover_gfa_ad_account(access_key, secret_key, customer_id)
+    _last_debug["discovered_ad_account"] = ad_account_no
+    if ad_account_no is None:
+        _last_debug["errors"].append("GFA 계정 못 찾음 (adPlatformType=GFA 없음)")
+        return _fetch_mock(start_date, end_date)
 
     try:
-        # 1. 캠페인 / 광고그룹 / 소재 메타 조회
+        # 1. 캠페인 / 광고그룹 / 소재 메타 조회 (TODO: GFA 전용 path 미확정)
         campaigns = _api_get(GFA_CAMPAIGNS_PATH, access_key, secret_key, customer_id)
         adgroups = _api_get(GFA_ADGROUPS_PATH, access_key, secret_key, customer_id)
         creatives = _api_get(GFA_CREATIVES_PATH, access_key, secret_key, customer_id)
@@ -225,9 +272,9 @@ def _api_get(
             response=resp,
         )
     data = resp.json()
-    # 응답 구조: 보통 {"data": [...]} 또는 [...] 그대로
+    # 응답 구조: 보통 {"content": [...]} (GFA), {"data": [...]} 또는 [...] 그대로
     if isinstance(data, dict):
-        return data.get("data", data.get("items", []))
+        return data.get("content", data.get("data", data.get("items", [])))
     return data
 
 
