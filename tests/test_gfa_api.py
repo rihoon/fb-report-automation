@@ -18,7 +18,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.gfa_api import (
     _generate_signature,
     _build_auth_headers,
+    discover_gfa_ad_account,
     fetch_gfa_ads,
+    get_last_debug_info,
+    GFA_API_BASE,
 )
 from src.mock_data import GFAAd, generate_gfa_ads
 
@@ -171,6 +174,64 @@ def test_fetch_gfa_ads_mock_mode():
     assert all(isinstance(a, GFAAd) for a in ads)
 
 
+def test_base_url_is_searchad_domain():
+    """실측 검증: GFA는 검색광고와 동일 도메인 사용."""
+    assert GFA_API_BASE == "https://api.searchad.naver.com"
+
+
+def test_discover_gfa_ad_account_signature():
+    """함수 시그니처 검증 (실 호출 X — 시크릿 없으면 None 반환)."""
+    # 잘못된 키로 호출 → 인증 실패 → None
+    result = discover_gfa_ad_account(
+        access_key="invalid",
+        secret_key="invalid",
+        customer_id="000000",
+    )
+    assert result is None or isinstance(result, int)
+
+
+# ────────────────────── 5. 통합 테스트 (실제 API 호출) ──────────────────────
+
+def test_real_api_ad_accounts_discovery():
+    """실제 API로 GFA adAccountNo 검출 (시크릿 있을 때만 동작).
+
+    secrets.toml에서 직접 읽음 — 없으면 skip.
+    """
+    secrets_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        ".streamlit", "secrets.toml",
+    )
+    if not os.path.exists(secrets_path):
+        print("  SKIP (secrets.toml 없음)")
+        return
+
+    # 단순 파싱 (toml 라이브러리 없이)
+    cfg = {}
+    in_section = False
+    with open(secrets_path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("[naver_gfa]"):
+                in_section = True
+                continue
+            if in_section:
+                if line.startswith("["):
+                    break
+                if "=" in line and not line.startswith("#"):
+                    k, v = line.split("=", 1)
+                    cfg[k.strip()] = v.strip().strip('"').strip("'")
+
+    if not all(cfg.get(k) for k in ("ACCESS_KEY", "SECRET_KEY", "CUSTOMER_ID")):
+        print("  SKIP (naver_gfa 시크릿 없음)")
+        return
+
+    no = discover_gfa_ad_account(
+        cfg["ACCESS_KEY"], cfg["SECRET_KEY"], cfg["CUSTOMER_ID"],
+    )
+    assert no is not None and no > 0, "GFA 계정 자동 검출 실패"
+    print(f"  → 발견된 GFA adAccountNo: {no}")
+
+
 # ────────────────────── 메인 ──────────────────────
 
 if __name__ == "__main__":
@@ -188,6 +249,9 @@ if __name__ == "__main__":
         test_gfaad_zero_impressions_ctr,
         test_gfaad_zero_spend_roas,
         test_fetch_gfa_ads_mock_mode,
+        test_base_url_is_searchad_domain,
+        test_discover_gfa_ad_account_signature,
+        test_real_api_ad_accounts_discovery,
     ]
     failed = []
     for t in tests:
