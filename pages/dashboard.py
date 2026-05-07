@@ -229,21 +229,58 @@ if generate_btn or st.session_state.get("dashboard_loaded", False):
     if gfa_src == "mock":
         src_messages.append("⚠️ **GFA: Mock 데이터** (시크릿 미설정 → 가짜 숫자)")
     elif gfa_src == "real_empty":
-        src_messages.append("ℹ️ GFA: 실 API OK이나 데이터 없음 (광고가 없거나 endpoint 미확정)")
+        src_messages.append("ℹ️ GFA: 실 API 호출은 됐지만 데이터 0건 (광고 없음 또는 /stat-reports endpoint 미확정 — 공식 GFA OpenAPI 문서 필요)")
     elif gfa_src == "real_error":
         errs = gfa_debug().get("errors", [])
         last_err = errs[-1] if errs else "알 수 없음"
         src_messages.append(f"❌ GFA: 실 API 호출 실패 — {last_err}")
+    elif gfa_src == "real":
+        src_messages.append("✅ GFA: 실 API 정상")
     if search_src == "mock":
         src_messages.append("⚠️ **검색광고: Mock 데이터** (시크릿 미설정 → 가짜 숫자)")
     elif search_src == "real_empty":
-        src_messages.append("ℹ️ 검색광고: 실 API OK이나 데이터 없음")
+        src_messages.append("ℹ️ 검색광고: 실 API 호출은 됐지만 데이터 0건")
     elif search_src == "real_error":
         errs = search_debug().get("errors", [])
         last_err = errs[-1] if errs else "알 수 없음"
         src_messages.append(f"❌ 검색광고: 실 API 호출 실패 — {last_err}")
+    elif search_src == "real":
+        src_messages.append("✅ 검색광고: 실 API 정상")
     if src_messages:
-        st.warning("\n\n".join(src_messages))
+        st.info("**데이터 출처**\n\n" + "\n\n".join(f"- {m}" for m in src_messages))
+
+    # ────── 캐시 새로고침 + API 진단 expander ──────
+    refresh_col, _ = st.columns([1, 5])
+    with refresh_col:
+        if st.button("🔄 캐시 새로고침", use_container_width=True, help="API 캐시(10분) 강제 비우고 재조회"):
+            _load_facebook_kpi.clear()
+            _load_gfa_kpi.clear()
+            _load_search_kpi.clear()
+            st.session_state["dashboard_loaded"] = True  # 유지
+            st.rerun()
+
+    with st.expander("🔍 API 진단 정보 (응답·에러 확인용)", expanded=False):
+        st.markdown("**페북** — 매칭된 KPI dict")
+        st.json(fb_kpi if fb_kpi else {})
+
+        st.markdown("**GFA** — 마지막 호출 진단")
+        gfa_dbg = gfa_debug()
+        st.write(f"데이터 출처: `{gfa_src}`")
+        st.write(f"발견된 GFA adAccountNo: `{gfa_dbg.get('discovered_ad_account', 'N/A')}`")
+        if gfa_dbg.get("errors"):
+            st.error("에러 메시지:\n" + "\n".join(f"- {e}" for e in gfa_dbg["errors"]))
+        if gfa_dbg.get("calls"):
+            st.write("API 호출 (마지막 5개)")
+            st.json(gfa_dbg["calls"][-5:])
+
+        st.markdown("**검색광고** — 마지막 호출 진단")
+        search_dbg = search_debug()
+        st.write(f"데이터 출처: `{search_src}`")
+        if search_dbg.get("errors"):
+            st.error("에러 메시지:\n" + "\n".join(f"- {e}" for e in search_dbg["errors"]))
+        if search_dbg.get("calls"):
+            st.write(f"API 호출 총 {len(search_dbg['calls'])}회 (마지막 5개)")
+            st.json(search_dbg["calls"][-5:])
 
     # ────────────────────── 채널별 광고비 비중 (altair 막대) ──────────────────────
 
