@@ -68,6 +68,73 @@ def get_sheet_id() -> str | None:
         return None
 
 
+def append_channel_section(
+    report_date: datetime,
+    channel_name: str,
+    df: pd.DataFrame,
+    color: str = "neutral",
+) -> tuple[bool, str]:
+    """기존 보고일 시트(MMDD 탭)에 채널 섹션 1개를 추가.
+
+    페북은 기존 append_report() 가 시트 전체를 새로 쓰는 흐름이고,
+    GFA·검색광고는 페북 작성 후 같은 시트에 ▶ 섹션을 덧붙이는 용도.
+
+    Args:
+        report_date: 보고일 (탭 이름 결정).
+        channel_name: 표시될 섹션 라벨 (예: "GFA 성과형", "네이버 검색광고").
+        df: 채널 데이터 DataFrame.
+        color: 헤더 색상 톤 ("green"=GFA, "blue"=검색, "neutral"=기본).
+    """
+    client, err = get_gspread_client_diag()
+    if not client:
+        return False, f"구글 인증 실패 — {err}"
+    sheet_id = get_sheet_id()
+    if not sheet_id:
+        return False, "secrets.toml의 [google] 섹션에 SHEET_ID 없음"
+
+    try:
+        spreadsheet = client.open_by_key(sheet_id)
+        sheet_name = report_date.strftime("%m%d")
+        try:
+            ws = spreadsheet.worksheet(sheet_name)
+        except Exception:
+            ws = spreadsheet.add_worksheet(title=sheet_name, rows=2000, cols=40)
+
+        # 기존 행 수 확인
+        existing = ws.get_all_values()
+        start_row = len([r for r in existing if any((c or "").strip() for c in r)])
+
+        n_cols = len(df.columns)
+        new_rows: list[list] = []
+        # 빈 줄 + 섹션 타이틀 + 헤더 + 데이터
+        new_rows.append([""] * max(1, n_cols))
+        new_rows.append([f"▶ {channel_name}"] + [""] * (n_cols - 1))
+        header_row_idx_offset = len(new_rows)  # 헤더는 그 다음
+        new_rows.append(list(df.columns.astype(str)))
+        for _, row in df.iterrows():
+            new_rows.append([_format_cell(c, row[c]) for c in df.columns])
+
+        ws.append_rows(new_rows, value_input_option="USER_ENTERED")
+
+        # 색상 적용 (헤더 행만 톤 설정)
+        try:
+            absolute_header_row = start_row + header_row_idx_offset + 1  # gspread는 1-indexed
+            color_map = {
+                "green": {"backgroundColor": {"red": 0.83, "green": 0.96, "blue": 0.79}},
+                "blue":  {"backgroundColor": {"red": 0.78, "green": 0.92, "blue": 0.99}},
+                "neutral": {"backgroundColor": {"red": 0.92, "green": 0.92, "blue": 0.92}},
+            }
+            fmt = color_map.get(color, color_map["neutral"])
+            last_col = _col_letter(n_cols)
+            ws.format(f"A{absolute_header_row}:{last_col}{absolute_header_row}", fmt)
+        except Exception:
+            pass
+
+        return True, f"'{sheet_name}' 탭에 ▶ {channel_name} 섹션 ({len(df)}행) 추가됨"
+    except Exception as e:
+        return False, f"섹션 추가 실패: {e}"
+
+
 def get_latest_sheet_url(report_date: datetime | None = None) -> str | None:
     """가장 최근 MMDD 탭을 가리키는 구글 시트 URL 반환.
 
