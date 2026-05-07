@@ -194,6 +194,41 @@ def _fetch_real(
         _last_debug["errors"].append("GFA 계정 못 찾음 (adPlatformType=GFA 없음)")
         return _fetch_mock(start_date, end_date)
 
+    # 1. 비동기 보고서 잡 시도 (SA 패턴 — GFA가 같은 endpoint면 동작)
+    #    실측 검증: POST /stat-reports {"reportTp":"AD_DETAIL","statDt":"YYYY-MM-DD"} → 200
+    #    응답: {"reportJobId":..., "status":"REGIST"} → 폴링 → BUILT 시 downloadUrl
+    #    현재 GFA 키로 호출 시 status=NONE (GFA 전용 endpoint 미확정)
+    try:
+        results: list[GFAAd] = []
+        # 기간 내 각 날짜에 대해 잡 생성 (statDt는 단일 날짜만)
+        from datetime import timedelta
+        for offset in range((end_date - start_date).days + 1):
+            day = start_date + timedelta(days=offset)
+            day_str = day.strftime("%Y-%m-%d")
+            rows = _fetch_report_for_date(
+                day_str, access_key, secret_key, customer_id, ad_account_no,
+            )
+            for r in rows:
+                results.append(_row_to_gfa_ad(r, day, day))
+        if not results:
+            _last_debug["errors"].append("모든 날짜 status=NONE — GFA 데이터 없음 또는 endpoint 미확정")
+            return _fetch_mock(start_date, end_date)
+        return results
+    except Exception as e:
+        _last_debug["errors"].append(f"_fetch_real: {type(e).__name__}: {e}")
+        return _fetch_mock(start_date, end_date)
+
+
+# 이하는 placeholder (활성화되지 않음 — TODO: GFA 메타 endpoint 확정 후 사용)
+def _fetch_real_old(
+    start_date: datetime,
+    end_date: datetime,
+    access_key: str,
+    secret_key: str,
+    customer_id: str,
+) -> list:
+    """기존 메타 조회 흐름 (placeholder, 호출되지 않음)."""
+    from src.mock_data import GFAAd
     try:
         # 1. 캠페인 / 광고그룹 / 소재 메타 조회 (TODO: GFA 전용 path 미확정)
         campaigns = _api_get(GFA_CAMPAIGNS_PATH, access_key, secret_key, customer_id)
@@ -248,6 +283,151 @@ def _fetch_real(
         _last_debug["errors"].append(f"{type(e).__name__}: {e}")
         # 실패 시 Mock fallback (앱 멈추지 않게)
         return _fetch_mock(start_date, end_date)
+
+
+# ────────────────────── 비동기 보고서 잡 흐름 ──────────────────────
+
+def _fetch_report_for_date(
+    statDt: str,
+    access_key: str,
+    secret_key: str,
+    customer_id: str,
+    ad_account_no: int,
+    report_tp: str = "AD_DETAIL",
+    max_polls: int = 30,
+    poll_interval: float = 2.0,
+) -> list:
+    """비동기 보고서 잡 생성 → 폴링 → 다운로드 → 파싱.
+
+    실측 검증된 흐름 (네이버 광고 시스템 표준):
+    1. POST /stat-reports {"reportTp": "AD_DETAIL", "statDt": "YYYY-MM-DD"}
+       → {"reportJobId": ..., "status": "REGIST"}
+    2. GET /stat-reports/{id} 폴링 → status BUILT 까지
+    3. status BUILT 시 downloadUrl 받아 데이터 다운로드 (TSV)
+    4. TSV 파싱 → 행 리스트 반환
+
+    status NONE이면 빈 리스트 (해당 날짜 데이터 없음).
+
+    Args:
+        statDt: "YYYY-MM-DD" (KST 기준, API가 UTC로 변환)
+        ad_account_no: GFA adAccountNo (옵션 — 잡 페이로드에 포함)
+        report_tp: "AD_DETAIL" 또는 "AD"
+    """
+    payload = {
+        "reportTp": report_tp,
+        "statDt": statDt,
+        "adAccountNo": ad_account_no,  # GFA 계정 명시
+    }
+    code, body = _raw_call("/stat-reports", "POST", access_key, secret_key, customer_id, body=payload)
+    if code != 200:
+        _last_debug["errors"].append(f"잡 생성 실패 {code}: {body[:200]}")
+        return []
+    job = _parse_json(body)
+    job_id = job.get("reportJobId")
+    if not job_id:
+        return []
+
+    # 2. 폴링
+    import time as _time
+    for i in range(max_polls):
+        _time.sleep(poll_interval)
+        code, body = _raw_call(f"/stat-reports/{job_id}", "GET", access_key, secret_key, customer_id)
+        if code != 200:
+            _last_debug["errors"].append(f"폴링 실패 {code}")
+            return []
+        j = _parse_json(body)
+        status = j.get("status")
+        if status == "BUILT":
+            download_url = j.get("downloadUrl", "")
+            if not download_url:
+                return []
+            return _download_and_parse_tsv(download_url, access_key, secret_key, customer_id)
+        if status in ("NONE", "FAILED"):
+            # NONE = 데이터 없음 (정상 응답)
+            return []
+    _last_debug["errors"].append(f"폴링 타임아웃 (job_id={job_id})")
+    return []
+
+
+def _raw_call(uri, method, access_key, secret_key, customer_id, body=None):
+    """저수준 HTTP 호출 (raw 응답 반환)."""
+    headers = _build_auth_headers(access_key, secret_key, customer_id, method, uri.split("?")[0])
+    url = f"{GFA_API_BASE}{uri}"
+    try:
+        r = requests.request(method, url, headers=headers, json=body, timeout=30)
+        _last_debug["calls"].append({"method": method, "uri": uri, "status": r.status_code})
+        return r.status_code, r.text
+    except Exception as e:
+        _last_debug["errors"].append(f"_raw_call {uri}: {type(e).__name__}: {e}")
+        return None, ""
+
+
+def _parse_json(text: str) -> dict:
+    import json as _json
+    try:
+        return _json.loads(text)
+    except Exception:
+        return {}
+
+
+def _download_and_parse_tsv(
+    download_url: str,
+    access_key: str,
+    secret_key: str,
+    customer_id: str,
+) -> list:
+    """downloadUrl 호출 → TSV 파싱 → 딕셔너리 행 리스트 반환.
+
+    헤더 + 데이터 행 구조. 첫 줄을 컬럼명으로, 나머지를 데이터로.
+    """
+    from urllib.parse import urlparse
+    p = urlparse(download_url)
+    sig_path = p.path
+    headers = _build_auth_headers(access_key, secret_key, customer_id, "GET", sig_path)
+    try:
+        r = requests.get(download_url, headers=headers, timeout=60)
+        if not r.ok:
+            _last_debug["errors"].append(f"다운로드 실패 {r.status_code}")
+            return []
+        text = r.text
+        lines = text.strip().split("\n")
+        if len(lines) < 2:
+            return []
+        header = lines[0].split("\t")
+        rows = []
+        for line in lines[1:]:
+            cells = line.split("\t")
+            row = {header[i]: cells[i] for i in range(min(len(header), len(cells)))}
+            rows.append(row)
+        # 진단: 첫 행 샘플 보존
+        if rows:
+            _last_debug["samples"] = rows[:3]
+        return rows
+    except Exception as e:
+        _last_debug["errors"].append(f"다운로드/파싱 실패: {type(e).__name__}: {e}")
+        return []
+
+
+def _row_to_gfa_ad(row: dict, date_start: datetime, date_stop: datetime):
+    """파싱된 행 → GFAAd 변환.
+
+    실제 컬럼명은 BUILT 보고서 다운로드 후 _last_debug["samples"]로 확인.
+    현재는 광고 시스템 표준 필드명 추측.
+    """
+    from src.mock_data import GFAAd
+    return GFAAd(
+        campaign_name=str(row.get("Campaign Name") or row.get("campaignName") or row.get("캠페인명") or ""),
+        adgroup_name=str(row.get("Ad Group Name") or row.get("adgroupName") or row.get("광고그룹명") or ""),
+        creative_name=str(row.get("Ad Name") or row.get("Creative") or row.get("creativeName") or row.get("소재명") or ""),
+        impressions=int(float(row.get("Impressions") or row.get("impressions") or row.get("노출수") or 0)),
+        clicks=int(float(row.get("Clicks") or row.get("clicks") or row.get("클릭수") or 0)),
+        spend=float(row.get("Cost") or row.get("cost") or row.get("salesAmt") or row.get("광고비") or 0),
+        conversion_count=int(float(row.get("Conversions") or row.get("ccnt") or row.get("전환수") or 0)),
+        revenue=float(row.get("Conversion Sales") or row.get("convAmt") or row.get("전환매출") or 0),
+        date_start=date_start,
+        date_stop=date_stop,
+        delivery_status="active",
+    )
 
 
 def _api_get(
