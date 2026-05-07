@@ -125,58 +125,98 @@ def _kpi_card(col, label: str, value: str, threshold_roas: float | None = None, 
     )
 
 
+def _render_total_kpi(slot, fb_kpi: dict | None, gfa_kpi: dict | None, search_kpi: dict | None):
+    """통합 KPI 카드 그리기 (None 채널은 0으로 처리)."""
+    fb = fb_kpi or {"total_spend": 0, "total_revenue": 0}
+    gfa = gfa_kpi or {"total_spend": 0, "total_revenue": 0}
+    sa = search_kpi or {"total_spend": 0, "total_revenue": 0}
+    total_spend = fb["total_spend"] + gfa["total_spend"] + sa["total_spend"]
+    total_revenue = fb["total_revenue"] + gfa["total_revenue"] + sa["total_revenue"]
+    total_roas = (total_revenue / total_spend * 100) if total_spend else 0.0
+    bg = "#FCE7F3" if total_roas >= 100 else "#DBEAFE"
+    with slot.container():
+        st.markdown(
+            f"""<style>[data-testid="stMetric"], .stMetric {{ background: {bg} !important; }}</style>""",
+            unsafe_allow_html=True,
+        )
+        with st.container(border=True):
+            c1, c2, c3 = st.columns(3)
+            c1.metric("총 광고비", f"₩{total_spend:,.0f}")
+            c2.metric("총 매출", f"₩{total_revenue:,.0f}")
+            c3.metric("통합 ROAS", f"{total_roas:.0f}%")
+
+
+def _render_channel_kpis(slot, fb_kpi: dict | None, gfa_kpi: dict | None, search_kpi: dict | None):
+    """채널별 9 KPI 카드 그리기 (None은 — 표시)."""
+    with slot.container():
+        with st.container(border=True):
+            cols = st.columns(9)
+            # 페북 (100%)
+            if fb_kpi is not None:
+                _kpi_card(cols[0], "페북 광고비", f"₩{fb_kpi['total_spend']:,.0f}", 100, fb_kpi["roas"])
+                _kpi_card(cols[1], "페북 매출", f"₩{fb_kpi['total_revenue']:,.0f}", 100, fb_kpi["roas"])
+                _kpi_card(cols[2], "페북 ROAS", f"{fb_kpi['roas']:.0f}%", 100, fb_kpi["roas"])
+            else:
+                _kpi_card(cols[0], "페북 광고비", "—")
+                _kpi_card(cols[1], "페북 매출", "—")
+                _kpi_card(cols[2], "페북 ROAS", "—")
+            # GFA (300%)
+            if gfa_kpi is not None:
+                _kpi_card(cols[3], "GFA 광고비", f"₩{gfa_kpi['total_spend']:,.0f}", 300, gfa_kpi["roas"])
+                _kpi_card(cols[4], "GFA 매출", f"₩{gfa_kpi['total_revenue']:,.0f}", 300, gfa_kpi["roas"])
+                _kpi_card(cols[5], "GFA ROAS", f"{gfa_kpi['roas']:.0f}%", 300, gfa_kpi["roas"])
+            else:
+                _kpi_card(cols[3], "GFA 광고비", "—")
+                _kpi_card(cols[4], "GFA 매출", "—")
+                _kpi_card(cols[5], "GFA ROAS", "—")
+            # 검색 (300%)
+            if search_kpi is not None:
+                _kpi_card(cols[6], "검색 광고비", f"₩{search_kpi['total_spend']:,.0f}", 300, search_kpi["roas"])
+                _kpi_card(cols[7], "검색 매출", f"₩{search_kpi['total_revenue']:,.0f}", 300, search_kpi["roas"])
+                _kpi_card(cols[8], "검색 ROAS", f"{search_kpi['roas']:.0f}%", 300, search_kpi["roas"])
+            else:
+                _kpi_card(cols[6], "검색 광고비", "⏳ 로딩 중...")
+                _kpi_card(cols[7], "검색 매출", "⏳ 로딩 중...")
+                _kpi_card(cols[8], "검색 ROAS", "⏳ 로딩 중...")
+
+
 if generate_btn or st.session_state.get("dashboard_loaded", False):
     st.session_state["dashboard_loaded"] = True
 
-    # 페북은 마케팅분석 엑셀이 있어야 매출 매칭 가능
+    # 페북은 마케팅분석 엑셀이 있어야 매출 매칭 가능 (없어도 광고비는 표시됨)
     naver_bytes = uploaded_current.getvalue() if uploaded_current is not None else None
     if naver_bytes is None:
-        st.warning("사이드바에서 **마케팅분석 엑셀**을 업로드하면 페북 매출이 매칭됩니다. (GFA·검색광고는 API에서 직접 조회되어 즉시 표시됨)")
+        st.info("ℹ️ 페북 매출 매칭 없음 — 마케팅분석 엑셀을 업로드하면 페북 매출도 매칭됩니다. GFA·검색광고는 API 직접 조회 (엑셀 불필요).")
 
-    with st.spinner("3채널 데이터 처리 중... (페북 + GFA + 검색광고)"):
-        # 3채널 병렬 fetch (각자 캐싱)
-        fb_kpi = _load_facebook_kpi(start.isoformat(), end.isoformat(), naver_bytes, int(days))
-        gfa_kpi = _load_gfa_kpi(start.isoformat(), end.isoformat())
-        search_kpi = _load_search_kpi(start.isoformat(), end.isoformat())
-
-    # ────────────────────── 통합 합산 KPI ──────────────────────
-
-    total_spend = fb_kpi["total_spend"] + gfa_kpi["total_spend"] + search_kpi["total_spend"]
-    total_revenue = fb_kpi["total_revenue"] + gfa_kpi["total_revenue"] + search_kpi["total_revenue"]
-    total_roas = (total_revenue / total_spend * 100) if total_spend else 0.0
-
+    # ───────── 자리 만들고 점진적으로 채워넣기 ─────────
     st.markdown("### 통합 결과 요약")
-    _bg = "#FCE7F3" if total_roas >= 100 else "#DBEAFE"
-    st.markdown(
-        f"""<style>[data-testid="stMetric"], .stMetric {{ background: {_bg} !important; }}</style>""",
-        unsafe_allow_html=True,
-    )
-    with st.container(border=True):
-        c1, c2, c3 = st.columns(3)
-        c1.metric("총 광고비", f"₩{total_spend:,.0f}")
-        c2.metric("총 매출", f"₩{total_revenue:,.0f}")
-        c3.metric("통합 ROAS", f"{total_roas:.0f}%")
-
-    # ────────────────────── 채널별 9 KPI 카드 (가로) ──────────────────────
+    total_kpi_slot = st.empty()
+    _render_total_kpi(total_kpi_slot, None, None, None)
 
     st.markdown("### 채널별 결과 요약")
-    with st.container(border=True):
-        cols = st.columns(9)
+    channel_kpi_slot = st.empty()
+    _render_channel_kpis(channel_kpi_slot, None, None, None)
 
-        # 페북 (임계값 100%)
-        _kpi_card(cols[0], "페북 광고비", f"₩{fb_kpi['total_spend']:,.0f}", 100, fb_kpi["roas"])
-        _kpi_card(cols[1], "페북 매출", f"₩{fb_kpi['total_revenue']:,.0f}", 100, fb_kpi["roas"])
-        _kpi_card(cols[2], "페북 ROAS", f"{fb_kpi['roas']:.0f}%", 100, fb_kpi["roas"])
+    # 1. 페북 fetch (~5s)
+    fb_kpi = None
+    with st.spinner("페북 광고 처리 중..."):
+        fb_kpi = _load_facebook_kpi(start.isoformat(), end.isoformat(), naver_bytes, int(days))
+    _render_total_kpi(total_kpi_slot, fb_kpi, None, None)
+    _render_channel_kpis(channel_kpi_slot, fb_kpi, None, None)
 
-        # GFA (임계값 300%)
-        _kpi_card(cols[3], "GFA 광고비", f"₩{gfa_kpi['total_spend']:,.0f}", 300, gfa_kpi["roas"])
-        _kpi_card(cols[4], "GFA 매출", f"₩{gfa_kpi['total_revenue']:,.0f}", 300, gfa_kpi["roas"])
-        _kpi_card(cols[5], "GFA ROAS", f"{gfa_kpi['roas']:.0f}%", 300, gfa_kpi["roas"])
+    # 2. GFA fetch (~5s)
+    gfa_kpi = None
+    with st.spinner("GFA 처리 중..."):
+        gfa_kpi = _load_gfa_kpi(start.isoformat(), end.isoformat())
+    _render_total_kpi(total_kpi_slot, fb_kpi, gfa_kpi, None)
+    _render_channel_kpis(channel_kpi_slot, fb_kpi, gfa_kpi, None)
 
-        # 검색 (임계값 300%)
-        _kpi_card(cols[6], "검색 광고비", f"₩{search_kpi['total_spend']:,.0f}", 300, search_kpi["roas"])
-        _kpi_card(cols[7], "검색 매출", f"₩{search_kpi['total_revenue']:,.0f}", 300, search_kpi["roas"])
-        _kpi_card(cols[8], "검색 ROAS", f"{search_kpi['roas']:.0f}%", 300, search_kpi["roas"])
+    # 3. 검색광고 fetch (~1~2분, 광고그룹마다 1콜)
+    search_kpi = None
+    with st.spinner("네이버 검색광고 처리 중 (광고그룹마다 1콜이라 1~2분 걸려요)..."):
+        search_kpi = _load_search_kpi(start.isoformat(), end.isoformat())
+    _render_total_kpi(total_kpi_slot, fb_kpi, gfa_kpi, search_kpi)
+    _render_channel_kpis(channel_kpi_slot, fb_kpi, gfa_kpi, search_kpi)
 
     # ────────────────────── 채널별 광고비 비중 (altair 막대) ──────────────────────
 
