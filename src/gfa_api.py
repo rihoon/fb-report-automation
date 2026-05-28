@@ -207,19 +207,48 @@ def _fetch_real(
         _data_source = "real_error"
         return []
 
+    # reportTp 변형 — GFA 전용 / 전환 전용 보고서 타입을 순서대로 시도
+    # 광고비가 0이어도 전환은 잡혀야 함 → 전환 전용 reportTp 우선 시도
+    REPORT_TP_VARIANTS = [
+        "AD_DETAIL",          # 기본 (광고비 포함)
+        "AD",                 # 광고 단위
+        "AD_CONVERSION",      # 전환 전용 (광고비 0이어도 데이터 있을 가능성)
+        "AD_DETAIL_CONVERSION",
+        "AD_OVERVIEW",
+    ]
+
     try:
         results: list[GFAAd] = []
         from datetime import timedelta
+
+        successful_tp: str | None = None
         for offset in range((end_date - start_date).days + 1):
             day = start_date + timedelta(days=offset)
             day_str = day.strftime("%Y-%m-%d")
-            rows = _fetch_report_for_date(
-                day_str, access_key, secret_key, customer_id, ad_account_no,
-            )
-            for r in rows:
+
+            day_rows: list[dict] = []
+            # 변형 reportTp 순회 — 첫 BUILT 응답 사용
+            for tp in REPORT_TP_VARIANTS:
+                rows = _fetch_report_for_date(
+                    day_str, access_key, secret_key, customer_id, ad_account_no,
+                    report_tp=tp,
+                )
+                if rows:  # 데이터 있으면 멈춤
+                    day_rows = rows
+                    if successful_tp is None:
+                        successful_tp = tp
+                        _last_debug.setdefault("info", []).append(
+                            f"✅ 작동한 reportTp: {tp}"
+                        )
+                    break
+
+            for r in day_rows:
                 results.append(_row_to_gfa_ad(r, day, day))
+
         if not results:
-            _last_debug["errors"].append("모든 날짜 status=NONE — GFA 데이터 없음 또는 endpoint 미확정")
+            _last_debug["errors"].append(
+                f"모든 reportTp 변형({REPORT_TP_VARIANTS}) 시도했으나 데이터 0건"
+            )
             _data_source = "real_empty"
             return []
         _data_source = "real"
