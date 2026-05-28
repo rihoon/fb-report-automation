@@ -40,7 +40,7 @@ def check_password() -> bool:
         st.markdown(
             """
             <div style="text-align: center; margin-bottom: 0.25rem;">
-              <h2 style="color: #111111; font-weight: 600; margin: 0; font-size: 1.5rem;">페북 성과보고서 오토파일럿</h2>
+              <h2 style="color: #111111; font-weight: 600; margin: 0; font-size: 1.5rem;">광고 통합 오토파일럿</h2>
             </div>
             <p style="text-align: center; color: #666666; font-size: 14px; margin-top: 0.25rem; margin-bottom: 2rem;">
               접근하려면 비밀번호를 입력하세요.
