@@ -199,8 +199,14 @@ def style_dataframe(df: pd.DataFrame, days: int | None = None):
     if df.empty:
         return df
 
+    # 방어 — 중복 컬럼이 있으면 첫 번째만 유지 (styler가 KeyError/Series ambiguous 나는 거 방지)
+    if df.columns.duplicated().any():
+        df = df.loc[:, ~df.columns.duplicated()].copy()
+
     df = reorder_columns(df, days)
     fmt = _build_format_dict(df)
+    # 안전 — fmt 키 중 실제 df에 없는 건 제외
+    fmt = {k: v for k, v in fmt.items() if k in df.columns}
     pct_cols = [c for c in df.columns if is_percent_column(c)]
 
     # 1) format 먼저

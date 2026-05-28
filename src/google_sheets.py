@@ -232,11 +232,15 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
         except Exception:
             ws = spreadsheet.add_worksheet(title=sheet_name, rows=2000, cols=40)
 
+        # 컬럼 중복 제거 (방어) — apply/format에서 Series ambiguous 에러 방지
+        if df.columns.duplicated().any():
+            df = df.loc[:, ~df.columns.duplicated()].copy()
+
         # df의 판정 컬럼에 기존 판정 복원 (df 사본 수정)
         if existing_judgments and "판정" in df.columns and "광고이름" in df.columns:
             df = df.copy()
             df["판정"] = df.apply(
-                lambda r: existing_judgments.get(str(r.get("광고이름", "")).strip(), r.get("판정", "")),
+                lambda r: existing_judgments.get(str(r.get("광고이름", "")).strip(), r.get("판정", "") or ""),
                 axis=1,
             )
 
