@@ -7,7 +7,7 @@ from datetime import datetime
 import pandas as pd
 import streamlit as st
 
-from src.gfa_api import fetch_gfa_ads
+from src.gfa_api import fetch_gfa_ads, get_data_source, get_last_debug_info
 from src.sidebar import render_sidebar
 
 
@@ -49,7 +49,25 @@ if generate_btn or st.session_state.get("gfa_report_loaded", False):
         ads = _load_gfa_ads(start.isoformat(), end.isoformat())
 
     if not ads:
-        st.warning("GFA 데이터가 없습니다. 시크릿(`[naver_gfa]`)을 확인하세요.")
+        src = get_data_source()
+        dbg = get_last_debug_info()
+        last_err = dbg.get("errors", ["알 수 없음"])[-1] if dbg.get("errors") else "에러 없음"
+        ad_account = dbg.get("discovered_ad_account", "N/A")
+
+        if src == "mock":
+            st.warning("⚠️ **시크릿 미설정** — `[naver_gfa]` 섹션이 secrets.toml 에 없거나 비어있습니다.")
+        elif src == "real_empty":
+            st.info(
+                f"ℹ️ **GFA API 호출은 정상** (adAccountNo: `{ad_account}`) 이지만 데이터가 0건입니다.\n\n"
+                f"가능한 원인:\n"
+                f"- 이 기간에 GFA 광고가 운영되지 않음\n"
+                f"- `/stat-reports` endpoint schema 미확정 — 공식 GFA OpenAPI 문서 필요\n\n"
+                f"마지막 진단: {last_err}"
+            )
+        elif src == "real_error":
+            st.error(f"❌ **GFA API 호출 실패** — {last_err}\n\nadAccountNo: `{ad_account}`")
+        else:
+            st.warning(f"GFA 데이터 없음 (출처: `{src}`)")
         st.stop()
 
     # ────────── KPI 집계 ──────────
