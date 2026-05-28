@@ -495,7 +495,11 @@ def append_report(df: pd.DataFrame, report_date: datetime) -> tuple[bool, str]:
             f"꺼진광고매출있음 {len(light_gray_row_indices)})"
         )
     except Exception as e:
-        return False, f"시트 저장 실패: {e}"
+        import traceback
+        tb = traceback.format_exc().splitlines()
+        # 마지막 3 줄만 (어느 파일/라인에서 실패했는지)
+        tb_tail = " | ".join(line.strip() for line in tb[-3:] if line.strip())
+        return False, f"시트 저장 실패: {e} [위치: {tb_tail[:200]}]"
 
 
 def fetch_validity_history(report_date: datetime, lookback_days: int = 7) -> dict:
